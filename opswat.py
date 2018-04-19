@@ -47,7 +47,7 @@ class OPSWATFileUpload():
 	def cli_file_upload(self):
 		args = sys.argv
 		self.current_filename = args[1]
-		wait_time = args[2] if len(args) > 2 else 5
+		wait_time = int(args[2]) if len(args) > 2 else 5
 		self.file = open(self.current_filename, 'rb')
 		report = self.get_report_by_hash()
 		report_json = report.json()
