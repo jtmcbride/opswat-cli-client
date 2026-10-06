@@ -102,4 +102,8 @@ export interface Settings {
   retention: number;
   /** New cards introduced per day per language; 0 = no limit. */
   dailyNewLimit: number;
+  /** Reviews per day to aim for. */
+  dailyGoal: number;
+  /** Local daily reminder time (native only); null = off. */
+  reminder: { hour: number; minute: number } | null;
 }

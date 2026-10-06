@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { BUILTIN_LANGUAGES } from '@/data';
+import { record, type ActivityLog } from '@/lib/activity';
 import { DEFAULT_MODEL, type ChatTurn } from '@/lib/ai';
 import { knownSrs, migrateSrs, newSrs, schedule } from '@/lib/srs';
 import { normalize } from '@/lib/tokenize';
@@ -33,6 +34,7 @@ export interface AppState {
   extraSentences: Record<LangCode, SentencePair[]>;
   chats: Record<LangCode, ChatTurn[]>;
   texts: ReadingText[];
+  activity: ActivityLog;
 
   setSettings: (patch: Partial<Settings>) => void;
   addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
@@ -56,7 +58,7 @@ export interface AppState {
 export type Backup = Pick<
   AppState,
   'settings' | 'customLanguages' | 'words' | 'userDicts' | 'extraSentences' | 'chats'
-> & Partial<Pick<AppState, 'texts'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
+> & Partial<Pick<AppState, 'texts' | 'activity'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
 
 const migrateWords = (words: KnownWord[]) => words.map((w) => ({ ...w, srs: migrateSrs(w.srs) }));
 
@@ -76,6 +78,8 @@ export const useStore = create<AppState>()(
         listening: true,
         retention: 0.9,
         dailyNewLimit: 20,
+        dailyGoal: 20,
+        reminder: null,
       },
       customLanguages: [],
       words: [],
@@ -84,6 +88,7 @@ export const useStore = create<AppState>()(
       extraSentences: {},
       chats: {},
       texts: [],
+      activity: {},
 
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
@@ -92,6 +97,7 @@ export const useStore = create<AppState>()(
         if (!w) return null;
         const exists = get().words.some((k) => k.lang === lang && normalize(k.word) === normalize(w));
         if (exists) return null;
+        set((s) => ({ activity: record(s.activity, lang, Date.now(), { added: 1 }) }));
         const kw: KnownWord = {
           id: uid(),
           lang,
@@ -117,7 +123,12 @@ export const useStore = create<AppState>()(
           const srs = opts?.known ? knownSrs(now, 7 + ((added.length * 7) % 50)) : newSrs(now);
           added.push({ id: uid(), lang, word: word.trim(), gloss: gloss.trim(), addedAt: now, srs });
         }
-        if (added.length) set((s) => ({ words: [...s.words, ...added] }));
+        if (added.length)
+          set((s) => ({
+            words: [...s.words, ...added],
+            // Placement-test words aren't "added" learning activity.
+            activity: opts?.known ? s.activity : record(s.activity, lang, now, { added: added.length }),
+          }));
         return added.length;
       },
 
@@ -128,6 +139,10 @@ export const useStore = create<AppState>()(
 
       gradeWord: (id, grade) =>
         set((s) => ({
+          activity: record(s.activity, s.words.find((w) => w.id === id)?.lang ?? s.settings.activeLang, Date.now(), {
+            reviews: 1,
+            again: grade === 'again' ? 1 : 0,
+          }),
           words: s.words.map((w) =>
             w.id === id ? { ...w, srs: schedule(w.srs, grade, Date.now(), { retention: s.settings.retention }) } : w,
           ),
@@ -195,6 +210,7 @@ export const useStore = create<AppState>()(
           extraSentences: backup.extraSentences ?? {},
           chats: backup.chats ?? {},
           texts: backup.texts ?? [],
+          activity: backup.activity ?? {},
           recentSentences: {},
         });
       },
@@ -214,7 +230,7 @@ export const useStore = create<AppState>()(
         const p = (persisted ?? {}) as Partial<AppState>;
         return { ...current, ...p, settings: { ...current.settings, ...p.settings } };
       },
-      partialize: ({ settings, customLanguages, words, userDicts, recentSentences, extraSentences, chats, texts }) => ({
+      partialize: ({ settings, customLanguages, words, userDicts, recentSentences, extraSentences, chats, texts, activity }) => ({
         settings,
         customLanguages,
         words,
@@ -223,6 +239,7 @@ export const useStore = create<AppState>()(
         extraSentences,
         chats,
         texts,
+        activity,
       }),
     },
   ),

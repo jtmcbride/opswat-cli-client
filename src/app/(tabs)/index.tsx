@@ -9,6 +9,7 @@ import { Button, Card, Chip, Input, Row, T } from '@/components/ui';
 import { MAX_WIDTH, space, useTheme } from '@/constants/theme';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { useNow } from '@/hooks/useNow';
+import { dayKey, streak } from '@/lib/activity';
 import { buildQueue } from '@/lib/queue';
 import { isDue, isLeech, isNew } from '@/lib/srs';
 import { normalize } from '@/lib/tokenize';
@@ -38,6 +39,10 @@ export default function WordsScreen() {
   const dailyNewLimit = useStore((s) => s.settings.dailyNewLimit);
   const now = useNow();
   const dueCount = useMemo(() => buildQueue(words, now, dailyNewLimit).cards.length, [words, now, dailyNewLimit]);
+  const dailyGoal = useStore((s) => s.settings.dailyGoal);
+  const days = useStore((s) => s.activity[lang]);
+  const streakDays = streak(days, now);
+  const todayReviews = days?.[dayKey(now)]?.reviews ?? 0;
   const shown = useMemo(() => {
     const f = normalize(filter);
     const list = f ? words.filter((w) => normalize(w.word).includes(f) || w.gloss.toLowerCase().includes(f)) : words;
@@ -97,6 +102,31 @@ export default function WordsScreen() {
 
   const header = (
     <View style={{ gap: space.lg, paddingBottom: space.md }}>
+      <Pressable
+        onPress={() => router.push('/stats')}
+        accessibilityRole="button"
+        accessibilityLabel="Progress and stats"
+        style={({ pressed }) => [styles.habit, { backgroundColor: t.surface, borderColor: t.border, opacity: pressed ? 0.7 : 1 }]}>
+        <Ionicons name="flame" size={22} color={streakDays > 0 ? t.accent : t.textMuted} />
+        <View style={{ flex: 1 }}>
+          <T style={{ fontWeight: '600' }}>
+            {streakDays > 0 ? `${streakDays}-day streak` : 'Start a streak today'}
+          </T>
+          <T variant="small">
+            Today {todayReviews} / {dailyGoal} reviews
+          </T>
+        </View>
+        <View style={[styles.goalTrack, { backgroundColor: t.surfaceAlt }]}>
+          <View
+            style={{
+              width: `${Math.min(1, todayReviews / Math.max(1, dailyGoal)) * 100}%`,
+              height: '100%',
+              backgroundColor: todayReviews >= dailyGoal ? t.success : t.primary,
+            }}
+          />
+        </View>
+        <Ionicons name="stats-chart" size={18} color={t.textMuted} />
+      </Pressable>
       <Row style={{ justifyContent: 'space-between' }}>
         <T variant="muted">
           {words.length} words · {dueCount} to study
@@ -231,4 +261,13 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 12, paddingHorizontal: 4 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
+  habit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  goalTrack: { width: 64, height: 8, borderRadius: 4, overflow: 'hidden' },
 });

@@ -34,6 +34,7 @@ export default function RootLayout() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="placement" options={{ title: 'Placement test', presentation: 'modal' }} />
+        <Stack.Screen name="stats" options={{ title: 'Progress' }} />
         <Stack.Screen name="dictionaries" options={{ title: 'Dictionaries' }} />
         <Stack.Screen name="read/new" options={{ title: 'New text', presentation: 'modal' }} />
         <Stack.Screen name="read/[id]" options={{ title: 'Read' }} />

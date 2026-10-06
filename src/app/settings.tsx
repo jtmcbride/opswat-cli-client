@@ -10,6 +10,7 @@ import { useApiKey } from '@/hooks/useApiKey';
 import { useCanSpeak } from '@/hooks/useSpeech';
 import { DEFAULT_MODEL } from '@/lib/ai';
 import { pickTextFile, shareText } from '@/lib/files';
+import { remindersSupported, scheduleDailyReminder } from '@/lib/reminders';
 import type { ReviewDirection } from '@/lib/types';
 import { languageName, useStore, type Backup } from '@/store/useStore';
 import { loadDictEntries } from '@/store/userDicts';
@@ -43,6 +44,13 @@ export default function SettingsScreen() {
   const [model, setModel] = useState(settings.aiModel);
   const [message, setMessage] = useState<string | null>(null);
   const canSpeak = useCanSpeak(settings.activeLang);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const setReminder = async (time: { hour: number; minute: number } | null) => {
+    setReminderError(null);
+    const ok = await scheduleDailyReminder(time);
+    if (ok) setSettings({ reminder: time });
+    else setReminderError('Notifications are turned off for this app. Enable them in your device settings.');
+  };
   const sample = starterDictionary(settings.activeLang)?.sentences[0]?.text ?? languageName(settings.activeLang, custom);
 
   const exportBackup = async () => {
@@ -59,6 +67,7 @@ export default function SettingsScreen() {
       extraSentences: s.extraSentences,
       chats: s.chats,
       texts: s.texts,
+      activity: s.activity,
       dictEntries,
     };
     await shareText(`lingo-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup));
@@ -118,6 +127,33 @@ export default function SettingsScreen() {
             <T style={{ flex: 1 }}>Include listening exercises</T>
             <Switch value={settings.listening} onValueChange={(v) => setSettings({ listening: v })} />
           </Row>
+        )}
+        <T variant="small">Daily review goal</T>
+        <Row>
+          {[10, 20, 50, 100].map((n) => (
+            <Chip key={n} label={String(n)} selected={settings.dailyGoal === n} onPress={() => setSettings({ dailyGoal: n })} />
+          ))}
+        </Row>
+        {remindersSupported && (
+          <>
+            <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+              <T style={{ flex: 1 }}>Daily reminder</T>
+              <Switch value={!!settings.reminder} onValueChange={(on) => setReminder(on ? settings.reminder ?? { hour: 19, minute: 0 } : null)} />
+            </Row>
+            {settings.reminder && (
+              <Row>
+                {[8, 12, 19, 21].map((h) => (
+                  <Chip
+                    key={h}
+                    label={`${h}:00`}
+                    selected={settings.reminder?.hour === h}
+                    onPress={() => setReminder({ hour: h, minute: 0 })}
+                  />
+                ))}
+              </Row>
+            )}
+            {reminderError && <T style={{ color: t.danger }}>{reminderError}</T>}
+          </>
         )}
         <T variant="small">New words per day</T>
         <Row>
