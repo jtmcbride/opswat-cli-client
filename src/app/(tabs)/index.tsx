@@ -8,7 +8,9 @@ import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, T } from '@/components/ui';
 import { MAX_WIDTH, space, useTheme } from '@/constants/theme';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
-import { isDue } from '@/lib/srs';
+import { useNow } from '@/hooks/useNow';
+import { buildQueue } from '@/lib/queue';
+import { isDue, isLeech, isNew } from '@/lib/srs';
 import { normalize } from '@/lib/tokenize';
 import type { DictEntry, KnownWord } from '@/lib/types';
 import { useStore } from '@/store/useStore';
@@ -33,7 +35,9 @@ export default function WordsScreen() {
     () => (index && word.trim() ? index.search(word, 6).filter((e) => normalize(e.lemma) !== normalize(word)) : []),
     [index, word],
   );
-  const dueCount = useMemo(() => words.filter((w) => isDue(w.srs)).length, [words]);
+  const dailyNewLimit = useStore((s) => s.settings.dailyNewLimit);
+  const now = useNow();
+  const dueCount = useMemo(() => buildQueue(words, now, dailyNewLimit).cards.length, [words, now, dailyNewLimit]);
   const shown = useMemo(() => {
     const f = normalize(filter);
     const list = f ? words.filter((w) => normalize(w.word).includes(f) || w.gloss.toLowerCase().includes(f)) : words;
@@ -95,7 +99,7 @@ export default function WordsScreen() {
     <View style={{ gap: space.lg, paddingBottom: space.md }}>
       <Row style={{ justifyContent: 'space-between' }}>
         <T variant="muted">
-          {words.length} known · {dueCount} due
+          {words.length} words · {dueCount} to study
         </T>
         <Row>
           <Chip label="One" selected={mode === 'single'} onPress={() => setMode('single')} />
@@ -193,7 +197,8 @@ export default function WordsScreen() {
 
 function WordRow({ word }: { word: KnownWord }) {
   const t = useTheme();
-  const due = isDue(word.srs);
+  const due = !word.suspended && !isNew(word.srs) && isDue(word.srs);
+  const tag = word.suspended ? 'suspended' : isLeech(word.srs) ? 'leech' : isNew(word.srs) ? 'new' : null;
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/word/[id]', params: { id: word.id } })}
@@ -204,6 +209,11 @@ function WordRow({ word }: { word: KnownWord }) {
           {word.gloss || '(no meaning)'}
         </T>
       </View>
+      {tag && (
+        <T variant="small" style={[styles.tag, { backgroundColor: tag === 'leech' ? t.accentSoft : t.surfaceAlt }]}>
+          {tag}
+        </T>
+      )}
       <SpeakButton text={word.word} lang={word.lang} size={20} id={`word:${word.id}`} />
       {due && <View style={[styles.dot, { backgroundColor: t.accent }]} />}
       <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
@@ -216,4 +226,5 @@ const styles = StyleSheet.create({
   suggestion: { flexDirection: 'row', gap: space.sm, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 12, paddingHorizontal: 4 },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
 });

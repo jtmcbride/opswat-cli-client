@@ -27,13 +27,20 @@ export interface DictionaryData {
 }
 
 export interface SrsState {
-  ease: number;
-  /** Interval in days. 0 = new / relearning. */
-  interval: number;
+  state: 'new' | 'learning' | 'review' | 'relearning';
+  /** FSRS stability: days until recall probability drops to 90%. 0 for new cards. */
+  stability: number;
+  /** FSRS difficulty, 1 (easy) – 10 (hard). 0 for new cards. */
+  difficulty: number;
+  /** Number of reviews. */
   reps: number;
+  /** Times forgotten after being learned. */
   lapses: number;
   /** Epoch ms when the card is next due. */
   due: number;
+  lastReview?: number;
+  /** When the card was first reviewed; used for the daily new-card limit. */
+  firstReview?: number;
 }
 
 export interface KnownWord {
@@ -46,6 +53,8 @@ export interface KnownWord {
   srs: SrsState;
   /** The sentence the word was learned from, used for fill-in-the-blank reviews. */
   context?: SentencePair;
+  /** Excluded from reviews (e.g. a leech the learner set aside). */
+  suspended?: boolean;
 }
 
 export type Grade = 'again' | 'hard' | 'good' | 'easy';
@@ -89,4 +98,8 @@ export interface Settings {
   reviewStyle: 'flip' | 'mixed';
   /** Include listening exercises in mixed reviews (needs a voice for the language). */
   listening: boolean;
+  /** Target recall probability for scheduling (FSRS desired retention). */
+  retention: number;
+  /** New cards introduced per day per language; 0 = no limit. */
+  dailyNewLimit: number;
 }

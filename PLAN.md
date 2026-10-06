@@ -119,9 +119,9 @@ Differences from the plan:
 
 ## 10. Roadmap (not yet built)
 
-4. **Better scheduling** — replace SM-2 with FSRS (fewer reviews for the same retention); daily
-   new-word limit; detect and flag "leeches" (words failed repeatedly); optional separate
-   scheduling per direction/exercise type.
+4. ~~**Better scheduling**~~ — done in v3: FSRS-5 with adjustable target recall, daily new-word
+   limit, leech flagging and suspend. Still open: optimizing FSRS parameters from the learner's own
+   review history, and separate scheduling per direction/exercise type.
 5. **Grammar awareness** — full conjugation/declension tables (e.g. from Wiktionary inflection
    data) so all forms of a known lemma are recognised; show gender and conjugation on word pages;
    an AI "explain this sentence" button.

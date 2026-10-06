@@ -7,7 +7,7 @@ import { Pressable, Text, type ColorValue } from 'react-native';
 import type { IconName } from '@/components/ui';
 import { useTheme } from '@/constants/theme';
 import { useNow } from '@/hooks/useNow';
-import { isDue } from '@/lib/srs';
+import { buildQueue } from '@/lib/queue';
 import { languageName, useStore } from '@/store/useStore';
 
 function LanguageButton() {
@@ -43,9 +43,13 @@ const icon = (name: IconName) =>
 export default function TabLayout() {
   const t = useTheme();
   const lang = useStore((s) => s.settings.activeLang);
+  const dailyNewLimit = useStore((s) => s.settings.dailyNewLimit);
   const words = useStore((s) => s.words);
   const now = useNow();
-  const due = useMemo(() => words.filter((w) => w.lang === lang && isDue(w.srs, now)).length, [words, lang, now]);
+  const due = useMemo(
+    () => buildQueue(words.filter((w) => w.lang === lang), now, dailyNewLimit).cards.length,
+    [words, lang, now, dailyNewLimit],
+  );
 
   return (
     <Tabs

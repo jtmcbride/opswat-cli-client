@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { BUILTIN_LANGUAGES } from '@/data';
 import { DEFAULT_MODEL, type ChatTurn } from '@/lib/ai';
-import { newSrs, schedule } from '@/lib/srs';
+import { migrateSrs, newSrs, schedule } from '@/lib/srs';
 import { normalize } from '@/lib/tokenize';
 import type {
   CustomLanguage,
@@ -37,7 +37,7 @@ export interface AppState {
   setSettings: (patch: Partial<Settings>) => void;
   addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
   addWords: (lang: LangCode, items: { word: string; gloss: string }[]) => number;
-  updateWord: (id: string, patch: Partial<Pick<KnownWord, 'word' | 'gloss'>>) => void;
+  updateWord: (id: string, patch: Partial<Pick<KnownWord, 'word' | 'gloss' | 'suspended'>>) => void;
   removeWord: (id: string) => void;
   gradeWord: (id: string, grade: Grade) => void;
   addCustomLanguage: (lang: CustomLanguage) => void;
@@ -58,6 +58,8 @@ export type Backup = Pick<
   'settings' | 'customLanguages' | 'words' | 'userDicts' | 'extraSentences' | 'chats'
 > & Partial<Pick<AppState, 'texts'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
 
+const migrateWords = (words: KnownWord[]) => words.map((w) => ({ ...w, srs: migrateSrs(w.srs) }));
+
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 export const useStore = create<AppState>()(
@@ -72,6 +74,8 @@ export const useStore = create<AppState>()(
         autoSpeak: false,
         reviewStyle: 'mixed',
         listening: true,
+        retention: 0.9,
+        dailyNewLimit: 20,
       },
       customLanguages: [],
       words: [],
@@ -122,7 +126,9 @@ export const useStore = create<AppState>()(
 
       gradeWord: (id, grade) =>
         set((s) => ({
-          words: s.words.map((w) => (w.id === id ? { ...w, srs: schedule(w.srs, grade) } : w)),
+          words: s.words.map((w) =>
+            w.id === id ? { ...w, srs: schedule(w.srs, grade, Date.now(), { retention: s.settings.retention }) } : w,
+          ),
         })),
 
       addCustomLanguage: (lang) =>
@@ -182,7 +188,7 @@ export const useStore = create<AppState>()(
         set({
           settings: { ...get().settings, ...backup.settings },
           customLanguages: backup.customLanguages ?? [],
-          words: backup.words ?? [],
+          words: migrateWords(backup.words ?? []),
           userDicts: backup.userDicts ?? [],
           extraSentences: backup.extraSentences ?? {},
           chats: backup.chats ?? {},
@@ -193,7 +199,13 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'lingo.state',
-      version: 1,
+      version: 2,
+      // v1 -> v2: SM-2 scheduling state becomes FSRS state.
+      migrate: (persisted, version) => {
+        const p = (persisted ?? {}) as Partial<AppState>;
+        if (version < 2 && p.words) p.words = migrateWords(p.words);
+        return p as AppState;
+      },
       storage: createJSONStorage(() => AsyncStorage),
       // Deep-merge settings so fields added in later versions get their defaults.
       merge: (persisted, current) => {

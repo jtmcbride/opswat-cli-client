@@ -9,9 +9,11 @@ device.
 
 - **Words**: add known words with dictionary autocomplete (inflected forms like *tengo* resolve
   to *tener*), bulk paste, or one-tap “starter” sets of the most common words.
-- **Review**: SM-2 spaced repetition. New words start as flip cards; after that, reviews mix typed
-  recall (meaning → word), fill-in-the-blank sentences, and listening (hear → type), checked
-  accent- and typo-tolerantly with a suggested grade you can override.
+- **Review**: FSRS spaced repetition (the scheduler Anki uses) with adjustable target recall, a
+  daily new-word limit, and leech detection (words you keep forgetting can be edited or
+  suspended). New words start as flip cards; after that, reviews mix typed recall
+  (meaning → word), fill-in-the-blank sentences, and listening (hear → type), checked accent- and
+  typo-tolerantly with a suggested grade you can override.
 - **Learn**: shows a sentence where every word is known except one (“i+1”). Guess from
   multiple choice or tap to reveal, then add the word to your list. Tap any word for its meaning.
 - **Read**: paste or import any text (or have AI write a story at ~95% known words). See what

@@ -21,7 +21,7 @@ const word = (w: string, reps = 2, extra: Partial<KnownWord> = {}): KnownWord =>
   word: w,
   gloss: '',
   addedAt: 0,
-  srs: { ...newSrs(0), reps },
+  srs: { ...newSrs(0), reps, state: reps === 0 ? 'new' : 'review', stability: reps ? 5 : 0 },
   ...extra,
 });
 

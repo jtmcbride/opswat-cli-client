@@ -116,6 +116,32 @@ export default function SettingsScreen() {
             <Switch value={settings.listening} onValueChange={(v) => setSettings({ listening: v })} />
           </Row>
         )}
+        <T variant="small">New words per day</T>
+        <Row>
+          {[10, 20, 50, 0].map((n) => (
+            <Chip
+              key={n}
+              label={n ? String(n) : 'No limit'}
+              selected={settings.dailyNewLimit === n}
+              onPress={() => setSettings({ dailyNewLimit: n })}
+            />
+          ))}
+        </Row>
+        <T variant="small">Target recall</T>
+        <Row>
+          {[0.8, 0.85, 0.9, 0.95].map((r) => (
+            <Chip
+              key={r}
+              label={`${Math.round(r * 100)}%`}
+              selected={settings.retention === r}
+              onPress={() => setSettings({ retention: r })}
+            />
+          ))}
+        </Row>
+        <T variant="small">
+          Reviews are scheduled (with FSRS) for when you&apos;re this likely to still remember a word. Higher means more
+          reviews; 90% is a good balance.
+        </T>
         <T variant="small">Flip card direction</T>
         <Row>
           {DIRECTIONS.map((d) => (

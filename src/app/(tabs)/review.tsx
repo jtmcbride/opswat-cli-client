@@ -18,7 +18,8 @@ import {
   type ExerciseKind,
 } from '@/lib/recall';
 import { speak, speechSupported } from '@/lib/speech';
-import { isDue, previewInterval } from '@/lib/srs';
+import { buildQueue } from '@/lib/queue';
+import { isLeech, isNew, previewInterval } from '@/lib/srs';
 import type { Grade, KnownWord } from '@/lib/types';
 import { useStore } from '@/store/useStore';
 
@@ -34,7 +35,8 @@ function formatWhen(ms: number, now: number) {
   if (mins < 60) return `${Math.max(1, mins)} min`;
   const hours = Math.round(mins / 60);
   if (hours < 24) return `${hours} h`;
-  return `${Math.round(hours / 24)} days`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? '1 day' : `${days} days`;
 }
 
 export default function ReviewScreen() {
@@ -50,11 +52,8 @@ export default function ReviewScreen() {
   const [reviewed, setReviewed] = useState(0);
 
   const words = useMemo(() => allWords.filter((w) => w.lang === lang), [allWords, lang]);
-  const due = useMemo(
-    () => words.filter((w) => isDue(w.srs, now)).sort((a, b) => a.srs.due - b.srs.due),
-    [words, now],
-  );
-  const card: KnownWord | undefined = due[0];
+  const queue = useMemo(() => buildQueue(words, now, settings.dailyNewLimit), [words, now, settings.dailyNewLimit]);
+  const card: KnownWord | undefined = queue.cards[0];
 
   const context = useMemo(
     () => (card && index && settings.reviewStyle === 'mixed' ? findContext(card, index, sentences, lemmas) : null),
@@ -81,13 +80,23 @@ export default function ReviewScreen() {
   }
 
   if (!card || !kind) {
-    const next = words.reduce((a, b) => (a.srs.due < b.srs.due ? a : b));
+    const scheduled = words.filter((w) => !w.suspended && !isNew(w.srs));
+    const next = scheduled.length ? scheduled.reduce((a, b) => (a.srs.due < b.srs.due ? a : b)) : null;
+    const waitingNew = words.filter((w) => !w.suspended && isNew(w.srs)).length;
+    const body = [
+      next ? `Next review in ${formatWhen(next.srs.due, now)}.` : null,
+      waitingNew && queue.newRemaining === 0
+        ? `${waitingNew} new ${waitingNew === 1 ? 'word is' : 'words are'} waiting: you've reached today's limit of ${settings.dailyNewLimit} new words (change it in Settings).`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
     return (
       <Screen>
         <Empty
           icon="checkmark-circle-outline"
           title={reviewed > 0 ? `Done! ${reviewed} reviewed` : 'All caught up'}
-          body={`Next card due in ${formatWhen(next.srs.due, now)}.`}>
+          body={body || undefined}>
           <Button title="Learn new words" icon="bulb" onPress={() => router.navigate('/learn')} />
         </Empty>
       </Screen>
@@ -101,7 +110,10 @@ export default function ReviewScreen() {
 
   return (
     <Screen>
-      <T variant="muted">{due.length} due</T>
+      <T variant="muted">
+        {queue.reviews} to review · {queue.newCards} new
+      </T>
+      {isLeech(card.srs) && <LeechNotice card={card} />}
       {kind === 'flip' ? (
         <FlipCard key={`${card.id}:${card.srs.reps}`} card={card} onGrade={grade} />
       ) : (
@@ -111,7 +123,24 @@ export default function ReviewScreen() {
   );
 }
 
+/** Shown on words forgotten many times: drilling them again rarely helps. */
+function LeechNotice({ card }: { card: KnownWord }) {
+  const t = useTheme();
+  const updateWord = useStore((s) => s.updateWord);
+  return (
+    <Card style={{ backgroundColor: t.accentSoft, borderColor: t.accent }}>
+      <T style={{ fontWeight: '600' }}>You&apos;ve forgotten this word {card.srs.lapses} times.</T>
+      <T variant="muted">Try adding a memory hook to its meaning, or set it aside for now.</T>
+      <Row>
+        <Button compact variant="secondary" title="Edit word" onPress={() => router.push({ pathname: '/word/[id]', params: { id: card.id } })} />
+        <Button compact variant="ghost" title="Suspend" onPress={() => updateWord(card.id, { suspended: true })} />
+      </Row>
+    </Card>
+  );
+}
+
 function GradeButtons({ card, onGrade, suggested }: { card: KnownWord; onGrade: (g: Grade) => void; suggested?: Grade }) {
+  const retention = useStore((s) => s.settings.retention);
   return (
     <Row style={{ flexWrap: 'nowrap' }}>
       {GRADES.map(({ grade: g, label }) => (
@@ -119,7 +148,7 @@ function GradeButtons({ card, onGrade, suggested }: { card: KnownWord; onGrade: 
           key={g}
           compact
           variant={suggested ? (g === suggested ? 'primary' : 'secondary') : g === 'again' ? 'danger' : g === 'good' ? 'primary' : 'secondary'}
-          title={`${label}\n${previewInterval(card.srs, g)}`}
+          title={`${label}\n${previewInterval(card.srs, g, undefined, { retention })}`}
           onPress={() => onGrade(g)}
           style={{ flex: 1, minHeight: 56 }}
         />

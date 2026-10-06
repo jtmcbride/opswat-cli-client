@@ -1,8 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
+import { Switch } from 'react-native';
 
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Input, Row, Screen, T } from '@/components/ui';
+import { isLeech } from '@/lib/srs';
 import { useStore } from '@/store/useStore';
 
 function formatDue(ms: number) {
@@ -38,8 +40,23 @@ export default function EditWordScreen() {
         <T variant="small">Meaning</T>
         <Input value={gloss} onChangeText={setGloss} />
         <T variant="small">
-          Reviewed {word.srs.reps} times · next review {formatDue(word.srs.due)}
+          {word.srs.state === 'new'
+            ? 'Not reviewed yet'
+            : `Reviewed ${word.srs.reps} times · forgotten ${word.srs.lapses} · next review ${formatDue(word.srs.due)}`}
         </T>
+        {word.srs.state !== 'new' && (
+          <T variant="small">
+            Memory stability {word.srs.stability < 1 ? '<1 day' : `${Math.round(word.srs.stability)} days`} · difficulty{' '}
+            {Math.round(word.srs.difficulty)}/10
+          </T>
+        )}
+        {isLeech(word.srs) && (
+          <T variant="small">This word keeps slipping. A memory hook in its meaning (e.g. a similar-sounding English word) often helps.</T>
+        )}
+        <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+          <T style={{ flex: 1 }}>Suspended (skip in reviews)</T>
+          <Switch value={!!word.suspended} onValueChange={(v) => updateWord(word.id, { suspended: v })} />
+        </Row>
       </Card>
       <Row>
         <Button

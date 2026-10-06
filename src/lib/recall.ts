@@ -60,7 +60,8 @@ export function chooseExercise(
   card: KnownWord,
   opts: { style: 'flip' | 'mixed'; hasContext: boolean; canListen: boolean },
 ): ExerciseKind {
-  if (opts.style === 'flip' || card.srs.reps === 0 || !card.word.trim()) return 'flip';
+  // New and just-forgotten cards are shown as flip cards (recognition) before recall is asked for.
+  if (opts.style === 'flip' || card.srs.state !== 'review' || !card.word.trim()) return 'flip';
   const kinds: ExerciseKind[] = ['type'];
   if (opts.hasContext) kinds.push('cloze', 'cloze');
   if (opts.canListen) kinds.push('listen');
