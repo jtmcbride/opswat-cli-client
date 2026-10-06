@@ -10,6 +10,7 @@ import { useApiKey } from '@/hooks/useApiKey';
 import { useCanSpeak } from '@/hooks/useSpeech';
 import { DEFAULT_MODEL } from '@/lib/ai';
 import { pickTextFile, shareText } from '@/lib/files';
+import { recognitionSupported } from '@/lib/recognition';
 import { remindersSupported, scheduleDailyReminder } from '@/lib/reminders';
 import type { ReviewDirection } from '@/lib/types';
 import { languageName, useStore, type Backup } from '@/store/useStore';
@@ -207,10 +208,22 @@ export default function SettingsScreen() {
               <Chip label="Slow" selected={settings.speechRate === 'slow'} onPress={() => setSettings({ speechRate: 'slow' })} />
             </Row>
             <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+              <T style={{ flex: 1 }}>Read tutor replies aloud in Chat</T>
+              <Switch value={settings.chatAutoSpeak} onValueChange={(v) => setSettings({ chatAutoSpeak: v })} />
+            </Row>
+            <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
               <T style={{ flex: 1 }}>Read words aloud on flashcards</T>
               <Switch value={settings.autoSpeak} onValueChange={(v) => setSettings({ autoSpeak: v })} />
             </Row>
             <T variant="small">Uses your device&apos;s voices. Long-press any speaker button to hear it slowly.</T>
+            {recognitionSupported ? (
+              <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                <T style={{ flex: 1 }}>Speaking practice (microphone): “Say it” buttons, speaking reviews, chat dictation</T>
+                <Switch value={settings.speaking} onValueChange={(v) => setSettings({ speaking: v })} />
+              </Row>
+            ) : (
+              <T variant="small">Speaking practice needs speech recognition, available in Chrome, Edge and Safari.</T>
+            )}
           </>
         ) : (
           <T variant="muted">

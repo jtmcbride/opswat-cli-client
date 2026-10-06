@@ -75,8 +75,11 @@ export function Button({
   loading,
   style,
   compact,
+  accessibilityLabel,
 }: {
   title: string;
+  /** Required for icon-only buttons (empty title). */
+  accessibilityLabel?: string;
   onPress?: () => void;
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   icon?: IconName;
@@ -91,6 +94,7 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? title}
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [

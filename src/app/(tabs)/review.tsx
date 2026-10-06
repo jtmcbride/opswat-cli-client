@@ -10,6 +10,7 @@ import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { useNow } from '@/hooks/useNow';
 import { useCanSpeak } from '@/hooks/useSpeech';
 import {
+  bestAnswer,
   checkAnswer,
   chooseExercise,
   findContext,
@@ -18,7 +19,8 @@ import {
   type Cloze,
   type ExerciseKind,
 } from '@/lib/recall';
-import { speak, speechSupported } from '@/lib/speech';
+import { listen, recognitionSupported } from '@/lib/recognition';
+import { speak, speechSupported, stopSpeaking } from '@/lib/speech';
 import { buildQueue } from '@/lib/queue';
 import { isLeech, isNew, previewInterval } from '@/lib/srs';
 import type { Grade, KnownWord } from '@/lib/types';
@@ -67,6 +69,7 @@ export default function ReviewScreen() {
         style: settings.reviewStyle,
         hasContext: !!context,
         canListen: settings.listening && speechSupported && voiceAvailable,
+        canSpeak: settings.speaking && recognitionSupported,
       })
     : null;
 
@@ -241,6 +244,23 @@ function RecallCard({
   }, []);
 
   const check = (giveUp = false) => setResult(giveUp ? 'wrong' : checkAnswer(input, expected));
+  const [listening, setListening] = useState<null | (() => void)>(null);
+  const [micError, setMicError] = useState<string | null>(null);
+  const sayIt = async () => {
+    setMicError(null);
+    await stopSpeaking();
+    const { result: heard, stop } = listen(card.lang);
+    setListening(() => stop);
+    try {
+      const best = bestAnswer(await heard, expected);
+      setInput(best.input);
+      setResult(best.result);
+    } catch (e) {
+      setMicError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setListening(null);
+    }
+  };
   const suggested = result ? SUGGESTED_GRADE[result] : undefined;
   const resultColor = result === 'exact' || result === 'accent' ? t.success : result === 'typo' ? t.accent : t.danger;
 
@@ -273,6 +293,12 @@ function RecallCard({
             </T>
           </>
         )}
+        {kind === 'speak' && (
+          <>
+            <T variant="small">Say the word for</T>
+            <T variant="big">{card.gloss || '(no meaning)'}</T>
+          </>
+        )}
         {kind === 'listen' && (
           <>
             <T variant="small">Type what you hear</T>
@@ -282,7 +308,18 @@ function RecallCard({
         )}
       </Card>
 
-      {result === null ? (
+      {result === null && kind === 'speak' ? (
+        <View style={{ gap: space.sm }}>
+          <Button
+            title={listening ? 'Listening… tap to stop' : 'Tap and say it'}
+            icon={listening ? 'stop' : 'mic'}
+            variant={listening ? 'danger' : 'primary'}
+            onPress={() => (listening ? listening() : sayIt())}
+          />
+          {micError && <T style={{ color: t.danger }}>{micError}</T>}
+          <Button title="Show me" variant="secondary" onPress={() => check(true)} />
+        </View>
+      ) : result === null ? (
         <View style={{ gap: space.sm }}>
           <Input
             value={input}
@@ -304,7 +341,11 @@ function RecallCard({
             <T variant="heading">{expected}</T>
             <SpeakButton text={kind === 'cloze' && cloze ? cloze.sentence.text : card.word} lang={card.lang} />
           </Row>
-          {input.trim() && result !== 'exact' && <T variant="muted">You wrote: {input.trim()}</T>}
+          {input.trim() && result !== 'exact' && (
+            <T variant="muted">
+              {kind === 'speak' ? 'Heard' : 'You wrote'}: {input.trim()}
+            </T>
+          )}
           {kind !== 'type' && <T variant="muted">{card.gloss}</T>}
           {kind === 'cloze' && cloze && result !== 'exact' && (
             <ExplainButton sentence={cloze.sentence.text} translation={cloze.sentence.translation} focus={cloze.answer} />

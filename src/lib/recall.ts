@@ -2,7 +2,7 @@ import type { DictIndex } from './dictionary';
 import { normalize, tokenize } from './tokenize';
 import type { Grade, KnownWord, SentencePair } from './types';
 
-export type ExerciseKind = 'flip' | 'type' | 'cloze' | 'listen';
+export type ExerciseKind = 'flip' | 'type' | 'cloze' | 'listen' | 'speak';
 export type AnswerResult = 'exact' | 'accent' | 'typo' | 'wrong';
 
 const clean = (s: string) =>
@@ -44,6 +44,18 @@ export function checkAnswer(input: string, expected: string): AnswerResult {
   return levenshtein(fa, fb) <= allowed ? 'typo' : 'wrong';
 }
 
+const RESULT_RANK: Record<AnswerResult, number> = { exact: 0, accent: 1, typo: 2, wrong: 3 };
+
+/** Best result over several candidate answers (e.g. speech recognition alternatives). */
+export function bestAnswer(inputs: string[], expected: string): { result: AnswerResult; input: string } {
+  let best = { result: 'wrong' as AnswerResult, input: inputs[0] ?? '' };
+  for (const input of inputs) {
+    const result = checkAnswer(input, expected);
+    if (RESULT_RANK[result] < RESULT_RANK[best.result]) best = { result, input };
+  }
+  return best;
+}
+
 export const SUGGESTED_GRADE: Record<AnswerResult, Grade> = {
   exact: 'good',
   accent: 'good',
@@ -58,13 +70,14 @@ export const SUGGESTED_GRADE: Record<AnswerResult, Grade> = {
  */
 export function chooseExercise(
   card: KnownWord,
-  opts: { style: 'flip' | 'mixed'; hasContext: boolean; canListen: boolean },
+  opts: { style: 'flip' | 'mixed'; hasContext: boolean; canListen: boolean; canSpeak?: boolean },
 ): ExerciseKind {
   // New and just-forgotten cards are shown as flip cards (recognition) before recall is asked for.
   if (opts.style === 'flip' || card.srs.state !== 'review' || !card.word.trim()) return 'flip';
   const kinds: ExerciseKind[] = ['type'];
   if (opts.hasContext) kinds.push('cloze', 'cloze');
   if (opts.canListen) kinds.push('listen');
+  if (opts.canSpeak) kinds.push('speak');
   let h = card.srs.reps * 31;
   for (const ch of card.id) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
   return kinds[h % kinds.length];

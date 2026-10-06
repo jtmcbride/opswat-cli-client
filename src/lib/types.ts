@@ -108,4 +108,8 @@ export interface Settings {
   dailyGoal: number;
   /** Local daily reminder time (native only); null = off. */
   reminder: { hour: number; minute: number } | null;
+  /** Speaking practice (needs browser speech recognition). */
+  speaking: boolean;
+  /** Read the chat tutor's replies aloud automatically. */
+  chatAutoSpeak: boolean;
 }

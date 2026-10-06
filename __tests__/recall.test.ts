@@ -1,5 +1,5 @@
 import { DictIndex } from '@/lib/dictionary';
-import { checkAnswer, chooseExercise, findContext, makeCloze } from '@/lib/recall';
+import { bestAnswer, checkAnswer, chooseExercise, findContext, makeCloze } from '@/lib/recall';
 import { newSrs } from '@/lib/srs';
 import type { KnownWord } from '@/lib/types';
 
@@ -37,6 +37,13 @@ describe('checkAnswer', () => {
   });
 });
 
+describe('bestAnswer', () => {
+  it('takes the best of several recognition alternatives', () => {
+    expect(bestAnswer(['casa', 'esta', 'está'], 'está')).toEqual({ result: 'exact', input: 'está' });
+    expect(bestAnswer(['perro'], 'gato').result).toBe('wrong');
+  });
+});
+
 describe('chooseExercise', () => {
   it('uses flip for new cards and flip-only style', () => {
     expect(chooseExercise(word('libro', 0), { style: 'mixed', hasContext: true, canListen: true })).toBe('flip');
@@ -46,6 +53,10 @@ describe('chooseExercise', () => {
   it('only picks available exercises and is stable', () => {
     const opts = { style: 'mixed' as const, hasContext: false, canListen: false };
     expect(chooseExercise(word('libro', 3), opts)).toBe('type');
+    const kinds = new Set(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((w) => chooseExercise(word(w, 3), { ...opts, canSpeak: true })),
+    );
+    expect(kinds).toEqual(new Set(['type', 'speak']));
     const a = chooseExercise(word('libro', 3), { ...opts, hasContext: true, canListen: true });
     expect(chooseExercise(word('libro', 3), { ...opts, hasContext: true, canListen: true })).toBe(a);
   });

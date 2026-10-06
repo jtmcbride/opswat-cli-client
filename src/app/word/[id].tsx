@@ -5,6 +5,7 @@ import { Switch } from 'react-native';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Input, Row, Screen, T } from '@/components/ui';
 import { InflectionTables } from '@/components/InflectionTables';
+import { SayIt } from '@/components/SayIt';
 import { useDictionary } from '@/hooks/useDictionary';
 import { withArticle } from '@/lib/grammar';
 import { isLeech } from '@/lib/srs';
@@ -65,6 +66,7 @@ export default function EditWordScreen() {
           <SpeakButton text={text} lang={word.lang} />
         </Row>
         <Input value={text} onChangeText={setText} />
+        <SayIt target={word.word} lang={word.lang} compact />
         <T variant="small">Meaning</T>
         <Input value={gloss} onChangeText={setGloss} />
         <T variant="small">

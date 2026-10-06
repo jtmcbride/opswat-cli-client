@@ -12,7 +12,9 @@ import { useApiKey } from '@/hooks/useApiKey';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { chatReply, type ChatTurn, type Correction } from '@/lib/ai';
 import { withArticle } from '@/lib/grammar';
+import { listen, recognitionSupported } from '@/lib/recognition';
 import { SCENARIOS } from '@/lib/scenarios';
+import { speak, stopSpeaking } from '@/lib/speech';
 import { normalize } from '@/lib/tokenize';
 import { languageName, useStore } from '@/store/useStore';
 
@@ -35,6 +37,7 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [peek, setPeek] = useState<{ word: string; lemma: string; gloss?: string } | null>(null);
+  const [dictating, setDictating] = useState<null | (() => void)>(null);
   const list = useRef<FlatList<{ turn: ChatTurn; i: number }>>(null);
   const savedPhrases = useMemo(() => new Set(words.map((w) => normalize(w.word))), [words]);
   const visible = useMemo(() => turns.map((turn, i) => ({ turn, i })).filter(({ turn }) => !turn.hidden), [turns]);
@@ -73,6 +76,7 @@ export default function ChatScreen() {
         i === history.length - 1 && turn.role === 'user' && r.corrections.length ? { ...turn, corrections: r.corrections } : turn,
       );
       setChat(lang, [...withCorrections, { role: 'assistant', text: r.reply, glosses: r.glosses }]);
+      if (settings.chatAutoSpeak) void speak(r.reply, lang, { id: `chat:${withCorrections.length}`, rate: settings.speechRate });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -100,6 +104,21 @@ export default function ChatScreen() {
   };
 
   const saveCorrection = (c: Correction) => addWord(lang, c.corrected, c.translation);
+
+  const dictate = async () => {
+    setError(null);
+    await stopSpeaking();
+    const { result, stop } = listen(lang);
+    setDictating(() => stop);
+    try {
+      const [best] = await result;
+      setDraft((d) => (d.trim() ? `${d.trim()} ${best}` : best));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDictating(null);
+    }
+  };
 
   return (
     <SafeAreaView edges={[]} style={{ flex: 1, backgroundColor: t.bg }}>
@@ -247,6 +266,16 @@ export default function ChatScreen() {
               returnKeyType="send"
               autoCorrect
             />
+            {recognitionSupported && settings.speaking && (
+              <Button
+                compact
+                variant={dictating ? 'danger' : 'ghost'}
+                icon={dictating ? 'stop' : 'mic'}
+                title=""
+                accessibilityLabel={dictating ? 'Stop dictation' : 'Dictate'}
+                onPress={() => (dictating ? dictating() : dictate())}
+              />
+            )}
             <Button title="Send" onPress={submit} disabled={!draft.trim() || sending} compact />
             <Button title="New" variant="ghost" compact onPress={() => setChat(lang, [], null)} />
           </View>

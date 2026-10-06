@@ -82,6 +82,8 @@ export const useStore = create<AppState>()(
         dailyNewLimit: 20,
         dailyGoal: 20,
         reminder: null,
+        speaking: true,
+        chatAutoSpeak: false,
       },
       customLanguages: [],
       words: [],

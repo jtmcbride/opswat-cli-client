@@ -125,8 +125,10 @@ Differences from the plan:
 5. ~~**Grammar awareness**~~ — done in v3: noun gender/articles, conjugation and declension tables
    on word pages (from Wiktionary, lazy-loaded), and an AI "Explain grammar" button. Still open:
    using the full tables for word recognition (currently only forms seen in the frequency list).
-6. **Speaking practice** — speech recognition to check pronunciation of words and sentences;
-   shadowing mode (listen, repeat, compare).
+6. ~~**Speaking practice**~~ — done in v3 (browsers with speech recognition: Chrome, Edge,
+   Safari): "Say it" with per-word feedback, speaking exercises in reviews, chat dictation and
+   read-aloud replies. Still open: the same in the native app (needs a speech-recognition module
+   and a development build).
 7. ~~**Chat that feeds review**~~ — done in v3: corrections shown under your messages and savable
    as flashcards, tutor-supplied glosses for new words, seven role-play scenarios plus custom ones.
    Voice mode moves to item 6.
