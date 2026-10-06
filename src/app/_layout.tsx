@@ -1,9 +1,10 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { useTheme } from '@/constants/theme';
+import { startCloudSync } from '@/store/cloud';
 import { useStore } from '@/store/useStore';
 
 const subscribeHydration = (cb: () => void) => useStore.persist.onFinishHydration(cb);
@@ -18,6 +19,9 @@ export default function RootLayout() {
   const t = useTheme();
   const hydrated = useHydrated();
   const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  useEffect(() => {
+    if (hydrated) void startCloudSync();
+  }, [hydrated]);
 
   if (!hydrated) {
     return (
@@ -33,6 +37,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerTintColor: t.primary, headerTitleStyle: { color: t.text } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="account" options={{ title: 'Account & sync' }} />
         <Stack.Screen name="placement" options={{ title: 'Placement test', presentation: 'modal' }} />
         <Stack.Screen name="stats" options={{ title: 'Progress' }} />
         <Stack.Screen name="dictionaries" options={{ title: 'Dictionaries' }} />

@@ -1,6 +1,6 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform, Switch } from 'react-native';
+import { Switch } from 'react-native';
 
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
@@ -9,11 +9,14 @@ import { starterDictionary } from '@/data';
 import { useApiKey } from '@/hooks/useApiKey';
 import { useCanSpeak } from '@/hooks/useSpeech';
 import { DEFAULT_MODEL } from '@/lib/ai';
+import { confirm } from '@/lib/confirm';
 import { pickTextFile, shareText } from '@/lib/files';
 import { recognitionSupported } from '@/lib/recognition';
 import { remindersSupported, scheduleDailyReminder } from '@/lib/reminders';
 import type { ReviewDirection } from '@/lib/types';
+import { syncConfigured } from '@/store/cloud';
 import { languageName, useStore, type Backup } from '@/store/useStore';
+import { useSync } from '@/store/useSync';
 import { loadDictEntries } from '@/store/userDicts';
 
 const DIRECTIONS: { value: ReviewDirection; label: string }[] = [
@@ -21,17 +24,6 @@ const DIRECTIONS: { value: ReviewDirection; label: string }[] = [
   { value: 'native', label: 'Meaning → word' },
   { value: 'mixed', label: 'Mixed' },
 ];
-
-function confirm(message: string, onYes: () => void) {
-  if (Platform.OS === 'web') {
-    if (globalThis.confirm?.(message)) onYes();
-    return;
-  }
-  Alert.alert('Are you sure?', message, [
-    { text: 'Cancel', style: 'cancel' },
-    { text: 'OK', style: 'destructive', onPress: onYes },
-  ]);
-}
 
 export default function SettingsScreen() {
   const t = useTheme();
@@ -52,6 +44,7 @@ export default function SettingsScreen() {
     if (ok) setSettings({ reminder: time });
     else setReminderError('Notifications are turned off for this app. Enable them in your device settings.');
   };
+  const account = useSync((s) => s.email);
   const sample = starterDictionary(settings.activeLang)?.sentences[0]?.text ?? languageName(settings.activeLang, custom);
 
   const exportBackup = async () => {
@@ -91,6 +84,15 @@ export default function SettingsScreen() {
 
   return (
     <Screen>
+      {syncConfigured && (
+        <Card>
+          <T variant="heading">Account & sync</T>
+          <T variant="muted">{account ? `Signed in as ${account}` : 'Sign in to sync your words and progress across devices.'}</T>
+          <Link href="/account" asChild>
+            <Button variant="secondary" icon={account ? 'person-circle-outline' : 'log-in-outline'} title={account ? 'Manage' : 'Sign in'} />
+          </Link>
+        </Card>
+      )}
       <Card>
         <T variant="heading">Language</T>
         <Row style={{ justifyContent: 'space-between' }}>

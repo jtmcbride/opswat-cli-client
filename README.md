@@ -2,8 +2,8 @@
 
 A simple, mobile-first vocabulary app. Track the words you know, drill them with spaced-repetition
 flashcards, pick up new words from context, and optionally chat with an AI tutor that sticks to
-your vocabulary. Runs on iOS, Android, and the web from one Expo codebase. All data stays on the
-device.
+your vocabulary. Runs on iOS, Android, and the web from one Expo codebase. Data stays on the
+device unless you turn on sync.
 
 ## Features
 
@@ -35,6 +35,8 @@ device.
   (frequency-ranked, with meanings and inflections) and ~12,000 example sentences each, built from
   open data (see `DATA-LICENSES.md`), plus curated starter sets. Import your own dictionary as CSV,
   TSV, JSON, or an Anki text export, for any language.
+- **Sync** (optional): sign in with an emailed code to sync words, reviews, texts, chats, settings
+  and progress across devices (Supabase). Without it, all data stays on the device.
 - **Backup**: export/import everything as JSON.
 
 ## Getting started
@@ -49,6 +51,25 @@ AI features need an [Anthropic API key](https://console.anthropic.com/). Paste i
 **Settings → AI tutor**. It is stored on the device (secure storage on iOS/Android, localStorage on
 web) and sent only to the Anthropic API. The default model is `claude-opus-5-5` and can be changed
 in Settings.
+
+## Cloud sync (optional)
+
+Sync uses a [Supabase](https://supabase.com) project; the free tier is enough. Builds without the
+two settings below simply hide sync.
+
+1. Create a project, open **SQL Editor**, and run
+   [`supabase/migrations/20261006000000_sync.sql`](supabase/migrations/20261006000000_sync.sql)
+   (or `npx supabase db push` with the Supabase CLI).
+2. **Authentication → Emails → Templates**: in **Magic Link** and **Confirm signup**, show the code
+   instead of (or as well as) the link, e.g. `<p>Your Lingo code: {{ .Token }}</p>`.
+3. **Authentication → Emails → SMTP**: the built-in sender only emails your project's team members
+   and a few messages an hour, so set up custom SMTP (e.g. Resend, Brevo) before inviting others.
+4. Copy the project URL and publishable key (**Project Settings → API Keys**) into `.env`
+   (see `.env.example`) for local builds, and into the repository's Actions **variables**
+   `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` for the GitHub Pages build. For EAS builds, add
+   them as EAS environment variables.
+
+Free projects pause after a week without activity; restore them from the dashboard.
 
 ## Scripts
 
@@ -67,7 +88,9 @@ Native builds: `npx eas-cli build -p ios|android` (see [EAS docs](https://docs.e
 src/app/            screens (expo-router): (tabs)/ Words, Review, Learn, Read, Chat; settings, stats, placement, read/, dictionaries, languages, word/[id]
 src/lib/            pure logic: srs.ts (FSRS), queue.ts, recall.ts, reading.ts, grammar.ts, placement.ts, activity.ts,
                     pronunciation.ts, tokenize.ts, dictionary.ts (DictIndex), picker.ts (i+1), importParser.ts, ai.ts
-src/store/          zustand store persisted to AsyncStorage; imported dictionaries stored per key
+src/store/          zustand store persisted to AsyncStorage; imported dictionaries stored per key;
+                    cloud.ts + useSync.ts drive sync (merge logic in src/lib/sync.ts, syncItems.ts)
+supabase/           database schema for sync
 src/data/           curated starter dictionaries (dictionaries/) and generated ones (generated/, lazy-loaded)
 tools/build-data/   pipeline that builds src/data/generated from open data (run by the Build dictionaries workflow)
 __tests__/          jest tests

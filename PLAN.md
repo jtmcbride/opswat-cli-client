@@ -117,7 +117,7 @@ Differences from the plan:
    coverage, tap-to-gloss (AI lookup for words missing from the dictionary), per-paragraph audio,
    and a list of the text's new words to add.
 
-## 10. Roadmap (not yet built)
+## 10. Roadmap
 
 4. ~~**Better scheduling**~~ — done in v3: FSRS-5 with adjustable target recall, daily new-word
    limit, leech flagging and suspend. Still open: optimizing FSRS parameters from the learner's own
@@ -136,5 +136,10 @@ Differences from the plan:
    added in review state with check-ins spread over weeks.
 9. ~~**Habit features**~~ — done in v3: daily goal, streak, Progress screen (retention, reviews
    per day, upcoming reviews, words added) and daily reminders on iOS/Android.
-10. **Accounts and sync** — optional sign-in with cloud sync across devices (currently local-only
-    with JSON backup).
+10. ~~**Accounts and sync**~~ — done in v4 with Supabase (free tier): email-code sign-in, and
+    per-item sync of words, reviews, texts, chats, settings, progress and imported dictionaries.
+    Each item merges last-write-wins (same-day activity takes the larger tally); a server write
+    counter is the pull cursor so device clock skew can't hide changes. Sync is hidden in builds
+    without Supabase config. Still open: realtime push (currently syncs on change, on focus and
+    every 2 minutes), account deletion from the app (only synced data is deleted), and choosing
+    whether a sign-in merges or replaces local data.
