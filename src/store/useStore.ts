@@ -33,6 +33,8 @@ export interface AppState {
   /** AI-generated practice sentences per language. */
   extraSentences: Record<LangCode, SentencePair[]>;
   chats: Record<LangCode, ChatTurn[]>;
+  /** Active role-play setup per language (tutor instructions); absent = free conversation. */
+  chatScenarios: Record<LangCode, string | undefined>;
   texts: ReadingText[];
   activity: ActivityLog;
 
@@ -48,7 +50,7 @@ export interface AppState {
   removeUserDict: (id: string) => Promise<void>;
   markSentenceSeen: (lang: LangCode, key: number) => void;
   addExtraSentences: (lang: LangCode, sentences: SentencePair[]) => void;
-  setChat: (lang: LangCode, turns: ChatTurn[]) => void;
+  setChat: (lang: LangCode, turns: ChatTurn[], scenario?: string | null) => void;
   addText: (text: Omit<ReadingText, 'id' | 'createdAt'>) => ReadingText;
   addTextGlosses: (id: string, glosses: Record<string, string>) => void;
   removeText: (id: string) => void;
@@ -87,6 +89,7 @@ export const useStore = create<AppState>()(
       recentSentences: {},
       extraSentences: {},
       chats: {},
+      chatScenarios: {},
       texts: [],
       activity: {},
 
@@ -185,7 +188,12 @@ export const useStore = create<AppState>()(
           return { extraSentences: { ...s.extraSentences, [lang]: [...existing, ...fresh] } };
         }),
 
-      setChat: (lang, turns) => set((s) => ({ chats: { ...s.chats, [lang]: turns } })),
+      setChat: (lang, turns, scenario) =>
+        set((s) => ({
+          chats: { ...s.chats, [lang]: turns },
+          // undefined keeps the current scenario; null clears it.
+          chatScenarios: scenario === undefined ? s.chatScenarios : { ...s.chatScenarios, [lang]: scenario ?? undefined },
+        })),
 
       addText: (text) => {
         const t: ReadingText = { ...text, id: uid(), createdAt: Date.now() };
@@ -230,7 +238,7 @@ export const useStore = create<AppState>()(
         const p = (persisted ?? {}) as Partial<AppState>;
         return { ...current, ...p, settings: { ...current.settings, ...p.settings } };
       },
-      partialize: ({ settings, customLanguages, words, userDicts, recentSentences, extraSentences, chats, texts, activity }) => ({
+      partialize: ({
         settings,
         customLanguages,
         words,
@@ -238,6 +246,18 @@ export const useStore = create<AppState>()(
         recentSentences,
         extraSentences,
         chats,
+        chatScenarios,
+        texts,
+        activity,
+      }) => ({
+        settings,
+        customLanguages,
+        words,
+        userDicts,
+        recentSentences,
+        extraSentences,
+        chats,
+        chatScenarios,
         texts,
         activity,
       }),

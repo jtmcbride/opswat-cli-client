@@ -127,8 +127,9 @@ Differences from the plan:
    using the full tables for word recognition (currently only forms seen in the frequency list).
 6. **Speaking practice** — speech recognition to check pronunciation of words and sentences;
    shadowing mode (listen, repeat, compare).
-7. **Chat that feeds review** — save the tutor's corrections as review cards; role-play scenarios
-   (café, directions, shopping); hands-free voice mode with TTS + speech recognition.
+7. ~~**Chat that feeds review**~~ — done in v3: corrections shown under your messages and savable
+   as flashcards, tutor-supplied glosses for new words, seven role-play scenarios plus custom ones.
+   Voice mode moves to item 6.
 8. ~~**Placement test**~~ — done in v3: band-by-band check with spot checks; known words are
    added in review state with check-ins spread over weeks.
 9. ~~**Habit features**~~ — done in v3: daily goal, streak, Progress screen (retention, reviews

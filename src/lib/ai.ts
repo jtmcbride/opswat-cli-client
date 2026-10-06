@@ -5,12 +5,45 @@ import type { SentencePair } from './types';
 
 export const DEFAULT_MODEL = 'claude-opus-5-5';
 
+export interface Correction {
+  /** The learner's sentence as written. */
+  original: string;
+  /** The corrected sentence. */
+  corrected: string;
+  /** Translation of the corrected sentence into the learner's language. */
+  translation: string;
+  /** One-line explanation of the mistake. */
+  note: string;
+}
+
 export interface ChatTurn {
   role: 'user' | 'assistant';
   text: string;
+  /** Not shown in the conversation (e.g. the turn that starts a role-play). */
+  hidden?: boolean;
+  /** On user turns: mistakes the tutor pointed out. */
+  corrections?: Correction[];
+  /** On assistant turns: meanings of words the learner doesn't know yet, keyed by lowercase word. */
+  glosses?: Record<string, string>;
+}
+
+export interface ChatResult {
+  reply: string;
+  corrections: Correction[];
+  glosses: Record<string, string>;
 }
 
 export class AiError extends Error {}
+const glossArraySchema = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: { word: { type: 'string' }, gloss: { type: 'string' } },
+    required: ['word', 'gloss'],
+    additionalProperties: false,
+  },
+} as const;
+
 
 function client(apiKey: string) {
   // The key is the user's own and never leaves their device except to call the API.
@@ -55,22 +88,65 @@ export async function chatReply(opts: {
   nativeLanguage: string;
   knownWords: string[];
   history: ChatTurn[];
-}): Promise<string> {
+  /** Role-play setup; free conversation when absent. */
+  scenario?: string;
+}): Promise<ChatResult> {
   const system = `You are a friendly ${opts.language} conversation partner for a language learner whose native language is ${opts.nativeLanguage}.
-Write only in ${opts.language}. Keep replies short (1-3 sentences) and natural, and end with a question or prompt that keeps the conversation going.
+Write your reply only in ${opts.language}. Keep replies short (1-3 sentences) and natural, and end with a question or prompt that keeps the conversation going.
 Build your replies mostly from the learner's known words. Introduce at most one or two new words per reply, choosing common, useful ones that are guessable from context.
-If the learner makes a mistake, model the correct form naturally in your reply; only explain grammar if asked. If the learner writes in ${opts.nativeLanguage}, reply in simple ${opts.language}.
+If the learner writes in ${opts.nativeLanguage}, reply in simple ${opts.language}.
+${opts.scenario ? `\nRole-play: ${opts.scenario}\nStay in character and keep the situation realistic and simple.\n` : ''}
+Also return:
+- "corrections": for each sentence in the learner's LAST message that has a real mistake (grammar, wrong word, spelling; not style), give the original sentence, the corrected sentence, its ${opts.nativeLanguage} translation, and a one-line ${opts.nativeLanguage} note on what was wrong. Empty if there were no mistakes or the message wasn't in ${opts.language}.
+- "new_words": every word in your reply that is not in the known list, as written in the reply (lowercase), with a short ${opts.nativeLanguage} meaning.
 
 Learner's known words: ${vocabList(opts.knownWords) || '(none yet: use very simple, common words)'}`;
 
   const res = await create(opts.apiKey, {
     model: opts.model,
-    max_tokens: 1024,
-    output_config: { effort: 'low' },
+    max_tokens: 2048,
+    output_config: {
+      effort: 'low',
+      format: {
+        type: 'json_schema',
+        schema: {
+          type: 'object',
+          properties: {
+            reply: { type: 'string' },
+            corrections: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  original: { type: 'string' },
+                  corrected: { type: 'string' },
+                  translation: { type: 'string' },
+                  note: { type: 'string' },
+                },
+                required: ['original', 'corrected', 'translation', 'note'],
+                additionalProperties: false,
+              },
+            },
+            new_words: glossArraySchema,
+          },
+          required: ['reply', 'corrections', 'new_words'],
+          additionalProperties: false,
+        },
+      },
+    },
     system,
     messages: opts.history.map((t) => ({ role: t.role, content: t.text })),
   });
-  return textOf(res);
+  const parsed = JSON.parse(textOf(res)) as {
+    reply: string;
+    corrections: Correction[];
+    new_words: { word: string; gloss: string }[];
+  };
+  return {
+    reply: parsed.reply,
+    corrections: parsed.corrections.filter((c) => c.corrected.trim() && c.corrected.trim() !== c.original.trim()),
+    glosses: Object.fromEntries(parsed.new_words.map((w) => [normalize(w.word), w.gloss])),
+  };
 }
 
 /** Generates short "i+1" sentences: all known words plus one new target word. */
@@ -142,15 +218,6 @@ Known words: ${vocabList(opts.knownWords)}`,
     }));
 }
 
-const glossArraySchema = {
-  type: 'array',
-  items: {
-    type: 'object',
-    properties: { word: { type: 'string' }, gloss: { type: 'string' } },
-    required: ['word', 'gloss'],
-    additionalProperties: false,
-  },
-} as const;
 
 /** A short graded-reader story built almost entirely from known words. */
 export async function generateStory(opts: {
