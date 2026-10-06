@@ -24,6 +24,7 @@ const POS_NAMES: Record<string, string> = {
   art: 'article',
   intj: 'interjection',
   num: 'number',
+  part: 'particle',
 };
 
 function formatDue(ms: number) {

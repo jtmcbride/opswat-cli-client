@@ -137,6 +137,36 @@ export class WikiIndex {
   }
 }
 
+const CYRILLIC = /\p{Script=Cyrillic}/u;
+
+/** Removes Serbo-Croatian tone and length marks ("kȕća" -> "kuća") but keeps č, ć, š, ž and đ. */
+export function stripTones(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/([aeiourAEIOUR])[\u0300\u0301\u0302\u0304\u0306\u030F\u0311]+/g, '$1')
+    .normalize('NFC');
+}
+
+/**
+ * Croatian comes from Wiktionary's Serbo-Croatian entries: keep the Latin script, drop tone marks
+ * (Croatian text doesn't write them), and drop senses marked Ekavian (Serbian; Croatian is
+ * ijekavian). Returns null for entries with nothing left.
+ */
+export function cleanSerboCroatian(entry: WikiEntry): WikiEntry | null {
+  if (CYRILLIC.test(entry.word)) return null;
+  const targets = (list?: { word: string }[]) => list?.map((t) => ({ word: stripTones(t.word) }));
+  const senses = (entry.senses ?? [])
+    .filter((s) => !s.tags?.includes('Ekavian'))
+    .map((s) => ({ ...s, form_of: targets(s.form_of), alt_of: targets(s.alt_of) }));
+  if (entry.senses?.length && !senses.length) return null;
+  return {
+    ...entry,
+    word: stripTones(entry.word),
+    senses,
+    forms: entry.forms?.filter((f) => f.form && !CYRILLIC.test(f.form)).map((f) => ({ ...f, form: stripTones(f.form) })),
+  };
+}
+
 /** Gender from the headword line ("casa f (plural casas)", "Haus n (strong, …)") or sense tags. */
 export function genderOf(entry: WikiEntry): string | undefined {
   const head = entry.head_templates?.[0]?.expansion ?? '';

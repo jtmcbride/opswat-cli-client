@@ -7,14 +7,33 @@ import { createReadStream, existsSync, readFileSync, writeFileSync } from 'node:
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { parseRawDictionary } from '../../src/data/format';
+import { parseRawDictionary, type RawDictionary } from '../../src/data/format';
 import de from '../../src/data/dictionaries/de';
 import es from '../../src/data/dictionaries/es';
 import fr from '../../src/data/dictionaries/fr';
+import hr from '../../src/data/dictionaries/hr';
 import it from '../../src/data/dictionaries/it';
 import pt from '../../src/data/dictionaries/pt';
 import { DictIndex } from '../../src/lib/dictionary';
-import { parseFrequencyList, rankLemmas, selectSentences, toGenerated, toInflections, WikiIndex, type Candidate } from './lib';
+import {
+  cleanSerboCroatian,
+  parseFrequencyList,
+  rankLemmas,
+  selectSentences,
+  toGenerated,
+  toInflections,
+  WikiIndex,
+  type Candidate,
+  type WikiEntry,
+} from './lib';
+
+interface LangConfig {
+  /** Tatoeba language code. */
+  iso3: string;
+  starter: RawDictionary;
+  /** Adjusts or drops (null) Wiktionary entries before indexing. */
+  prepare?: (entry: WikiEntry) => WikiEntry | null;
+}
 
 const LANGS = {
   es: { iso3: 'spa', starter: es },
@@ -22,7 +41,8 @@ const LANGS = {
   de: { iso3: 'deu', starter: de },
   it: { iso3: 'ita', starter: it },
   pt: { iso3: 'por', starter: pt },
-} as const;
+  hr: { iso3: 'hrv', starter: hr, prepare: cleanSerboCroatian },
+} satisfies Record<string, LangConfig>;
 type Lang = keyof typeof LANGS;
 
 const WORDS = 5000;
@@ -65,7 +85,11 @@ async function main() {
     for await (const line of lines(wikiPath)) {
       if (!line) continue;
       try {
-        wiki.add(JSON.parse(line));
+        const raw = JSON.parse(line) as WikiEntry;
+        const { prepare } = LANGS[lang] as LangConfig;
+        const entry = prepare ? prepare(raw) : raw;
+        if (!entry) continue;
+        wiki.add(entry);
         n++;
       } catch {
         // Skip malformed lines.

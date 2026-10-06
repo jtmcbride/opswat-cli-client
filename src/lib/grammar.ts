@@ -43,6 +43,7 @@ const PRONOUNS: Record<string, Record<string, string>> = {
   de: { '1s': 'ich', '2s': 'du', '3s': 'er/sie/es', '1p': 'wir', '2p': 'ihr', '3p': 'sie/Sie' },
   it: { '1s': 'io', '2s': 'tu', '3s': 'lui/lei', '1p': 'noi', '2p': 'voi', '3p': 'loro' },
   pt: { '1s': 'eu', '2s': 'tu', '3s': 'ele/ela/você', '1p': 'nós', '2p': 'vós', '3p': 'eles/elas/vocês' },
+  hr: { '1s': 'ja', '2s': 'ti', '3s': 'on/ona/ono', '1p': 'mi', '2p': 'vi', '3p': 'oni/one/ona' },
 };
 const PERSON: Record<string, string> = { 'first-person': '1', 'second-person': '2', 'third-person': '3' };
 const NUMBER: Record<string, string> = { singular: 's', plural: 'p' };

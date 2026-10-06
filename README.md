@@ -32,8 +32,9 @@ device unless you turn on sync.
   with speech recognition: Chrome, Edge, Safari).
 - **Progress**: streak and daily review goal on the Words tab; a Progress screen with retention,
   reviews per day, upcoming reviews and words added; optional daily reminder (iOS/Android).
-- **Dictionaries**: built-in Spanish, French, German, Italian, and Portuguese with 5,000 words
-  (frequency-ranked, with meanings and inflections) and ~12,000 example sentences each, built from
+- **Dictionaries**: built-in Spanish, French, German, Italian, Portuguese and Croatian with 5,000
+  words (frequency-ranked, with meanings and inflections) and up to ~12,000 example sentences each
+  (Croatian has fewer: Tatoeba has less Croatian), built from
   open data (see `DATA-LICENSES.md`), plus curated starter sets. Import your own dictionary as CSV,
   TSV, JSON, or an Anki text export, for any language.
 - **Sync** (optional): sign in with an emailed code to sync words, reviews, texts, chats, settings

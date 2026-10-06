@@ -4,7 +4,8 @@ import type { DictEntry, DictionaryData, SentencePair } from '@/lib/types';
 /**
  * Built-in dictionaries are authored in a compact, diff-friendly text format:
  *
- *   entries:   lemma | gloss | pos | form1, form2, ...      (ordered by frequency)
+ *   entries:   lemma | gloss | pos | form1, form2, ...      (ordered by frequency; pos may carry a
+ *              noun's gender: "n:f")
  *   sentences: text | translation
  *
  * Blank lines and lines starting with `#` are ignored.
@@ -24,12 +25,14 @@ const lines = (s: string) =>
 
 export function parseRawDictionary(raw: RawDictionary): DictionaryData {
   const entries: DictEntry[] = lines(raw.entries).map((line, i) => {
-    const [lemma, gloss, pos, forms] = line.split('|').map((c) => c.trim());
+    const [lemma, gloss, posField, forms] = line.split('|').map((c) => c.trim());
+    const [pos, gender] = (posField ?? '').split(':');
     return {
       lemma,
       gloss,
       rank: i + 1,
       ...(pos ? { pos } : {}),
+      ...(gender ? { gender } : {}),
       ...(forms ? { forms: forms.split(',').map((f) => f.trim()).filter(Boolean) } : {}),
     };
   });

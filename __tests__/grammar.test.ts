@@ -11,6 +11,7 @@ describe('withArticle', () => {
     expect(withArticle('it', 'libro', 'm')).toBe('il libro');
     expect(withArticle('pt', 'casa', 'f')).toBe('a casa');
     expect(withArticle('es', 'correr')).toBe('correr');
+    expect(withArticle('hr', 'kuća', 'f')).toBe('kuća (f.)');
   });
 });
 
@@ -23,6 +24,14 @@ describe('groupInflections', () => {
     ]);
     expect(sections.map((s) => s.title)).toEqual(['Present', 'Subjunctive II']);
     expect(sections[0].rows.map((r) => r.label)).toEqual(['er/sie/es', 'ich']);
+  });
+
+  it('uses Croatian pronouns for person rows', () => {
+    const sections = groupInflections('hr', [
+      ['gledam', ['present', 'first-person', 'singular']],
+      ['gledaju', ['present', 'third-person', 'plural']],
+    ]);
+    expect(sections[0].rows.map((r) => r.label)).toEqual(['ja', 'oni/one/ona']);
   });
 
   it('groups conjugations by tense with pronoun rows, and other forms separately', () => {

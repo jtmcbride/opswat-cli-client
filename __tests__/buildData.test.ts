@@ -1,5 +1,7 @@
 import {
   cleanGloss,
+  cleanSerboCroatian,
+  stripTones,
   genderOf,
   inflectionTable,
   parseFrequencyList,
@@ -183,5 +185,30 @@ describe('grammar data', () => {
     expect(parsed.entries[0]).toMatchObject({ lemma: 'Haus', pos: 'n', gender: 'n' });
     const infl = toInflections('de', entries, w);
     expect(infl.lemmas.Haus[0]).toEqual(['Hauses', infl.tags.indexOf('genitive')]);
+  });
+});
+
+describe('Serbo-Croatian (Croatian) data', () => {
+  it('strips tone marks but keeps Croatian letters', () => {
+    expect(stripTones('kȕća')).toBe('kuća');
+    expect(stripTones('glȅdām')).toBe('gledam');
+    expect(stripTones('pȑst')).toBe('prst');
+    expect(stripTones('čćđšž ČĆĐŠŽ')).toBe('čćđšž ČĆĐŠŽ');
+  });
+
+  it('keeps Latin-script ijekavian entries only', () => {
+    expect(cleanSerboCroatian({ word: 'кућа', pos: 'noun', senses: [{ glosses: ['house'] }] })).toBeNull();
+    expect(cleanSerboCroatian({ word: 'mleko', pos: 'noun', senses: [{ glosses: ['milk'], tags: ['Ekavian'] }] })).toBeNull();
+    const e = cleanSerboCroatian({
+      word: 'kuća',
+      pos: 'noun',
+      senses: [{ glosses: ['house'] }],
+      forms: [
+        { form: 'kȕća', tags: ['canonical'] },
+        { form: 'кућа', tags: ['Cyrillic'] },
+        { form: 'kȕće', tags: ['genitive', 'singular'] },
+      ],
+    })!;
+    expect(e.forms?.map((f) => f.form)).toEqual(['kuća', 'kuće']);
   });
 });

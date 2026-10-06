@@ -297,7 +297,8 @@ export const useStore = create<AppState>()(
 
 export function useLanguages() {
   const custom = useStore((s) => s.customLanguages);
-  return [...BUILTIN_LANGUAGES, ...custom];
+  // A language added by hand before it became built-in (e.g. Croatian) shows once, as built-in.
+  return [...BUILTIN_LANGUAGES, ...custom.filter((c) => !BUILTIN_LANGUAGES.some((b) => b.code === c.code))];
 }
 
 export function languageName(code: LangCode, custom: CustomLanguage[]) {

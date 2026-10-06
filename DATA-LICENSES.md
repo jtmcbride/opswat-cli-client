@@ -9,6 +9,9 @@ The app code is separate from the language data it ships.
 | Meanings and inflected forms | [English Wiktionary](https://en.wiktionary.org/), extracted by [wiktextract](https://github.com/tatuylonen/wiktextract) / [kaikki.org](https://kaikki.org/) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
 | Example sentences and translations | [Tatoeba](https://tatoeba.org/) | [CC BY 2.0 FR](https://creativecommons.org/licenses/by/2.0/fr/) |
 
+Croatian meanings and inflections come from Wiktionary's Serbo-Croatian entries, limited to the
+Latin script and ijekavian (Croatian) usage, with tone marks removed.
+
 The generated files in `src/data/generated/` combine these sources and are therefore distributed
 under CC BY-SA 4.0. Rebuild them with the **Build dictionaries** workflow, or locally:
 

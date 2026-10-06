@@ -149,3 +149,11 @@ Differences from the plan:
     without Supabase config. Still open: realtime push (currently syncs on change, on focus and
     every 2 minutes), account deletion from the app (only synced data is deleted), and choosing
     whether a sign-in merges or replaces local data.
+
+## 11. Languages added later
+
+- **Croatian (v4):** hand-written starter set (~300 words, 80+ sentences, nouns with gender), plus
+  generated data from Croatian subtitles, Wiktionary's Serbo-Croatian entries (Latin script,
+  ijekavian, tone marks stripped) and Tatoeba. Pronoun rows (ja, ti, on/ona/ono…) in conjugation
+  tables; nouns show gender as "kuća (f.)" since Croatian has no articles. Declension tables use the
+  generic case grouping; a case × number grid would read better (still open).

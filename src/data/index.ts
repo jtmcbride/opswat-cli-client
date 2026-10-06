@@ -11,10 +11,11 @@ import {
 import de from './dictionaries/de';
 import es from './dictionaries/es';
 import fr from './dictionaries/fr';
+import hr from './dictionaries/hr';
 import it from './dictionaries/it';
 import pt from './dictionaries/pt';
 
-const RAW: Record<string, RawDictionary> = { es, fr, de, it, pt };
+const RAW: Record<string, RawDictionary> = { es, fr, de, it, pt, hr };
 
 // Large generated dictionaries are imported lazily so only the active language is loaded.
 const GENERATED: Record<string, () => Promise<unknown>> = {
@@ -23,6 +24,7 @@ const GENERATED: Record<string, () => Promise<unknown>> = {
   de: () => import('./generated/de.json'),
   it: () => import('./generated/it.json'),
   pt: () => import('./generated/pt.json'),
+  hr: () => import('./generated/hr.json'),
 };
 
 export const BUILTIN_LANGUAGES = Object.values(RAW).map((r) => ({ code: r.lang, name: r.name }));
@@ -75,6 +77,7 @@ const INFLECTIONS: Record<string, () => Promise<unknown>> = {
   de: () => import('./generated/de-forms.json'),
   it: () => import('./generated/it-forms.json'),
   pt: () => import('./generated/pt-forms.json'),
+  hr: () => import('./generated/hr-forms.json'),
 };
 const inflectionCache = new Map<string, Promise<Inflections | null>>();
 

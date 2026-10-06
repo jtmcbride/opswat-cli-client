@@ -13,6 +13,7 @@ export const PREFERRED_LOCALES: Record<LangCode, string[]> = {
   de: ['de-DE', 'de-AT', 'de-CH'],
   it: ['it-IT'],
   pt: ['pt-BR', 'pt-PT'],
+  hr: ['hr-HR'],
 };
 
 const norm = (locale: string) => locale.replace(/_/g, '-').toLowerCase();

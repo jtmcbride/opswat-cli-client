@@ -36,6 +36,7 @@ describe.each(BUILTIN_LANGUAGES.map((l) => l.code))('built-in dictionary %s', (c
       de: [['ist', 'sein'], ['die', 'der']],
       it: [['è', 'essere'], ['la', 'il']],
       pt: [['é', 'ser'], ['a', 'a']],
+      hr: [['je', 'biti'], ['sam', 'biti'], ['kućama', 'kuća']],
     };
     for (const [form, lemma] of checks[code]) expect(index.lemmaOf(form)).toBe(lemma);
   });
@@ -66,6 +67,7 @@ describe.each(BUILTIN_LANGUAGES.map((l) => l.code))('built-in dictionary %s', (c
       de: [['gingen', 'gehen'], ['hättet', 'haben'], ['ist', 'sein']],
       it: [['avessimo', 'avere'], ['facessero', 'fare'], ['è', 'essere']],
       pt: [['tivéramos', 'ter'], ['tiverdes', 'ter'], ['é', 'ser']],
+      hr: [['gledajte', 'gledati'], ['čitajmo', 'čitati'], ['je', 'biti']],
     };
     for (const [form, lemma] of checks[code]) expect([form, index.lemmaOf(form)]).toEqual([form, lemma]);
     // Autocomplete stays limited to dictionary forms.
