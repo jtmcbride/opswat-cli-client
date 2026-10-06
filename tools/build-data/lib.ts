@@ -41,6 +41,12 @@ const SKIP_SENSE_TAGS = new Set(['obsolete', 'archaic', 'dated', 'rare', 'histor
 const SKIP_FORM_TAGS = new Set(['table-tags', 'inflection-template', 'class', 'romanization', 'error-unrecognized-form']);
 const MAX_GLOSSES = 3;
 const MAX_GLOSS_LEN = 60;
+const MAX_TOTAL_GLOSS = 70;
+/** Glosses that describe grammar rather than translate; used only if nothing better exists. */
+const DESCRIPTIVE = /^(used|indicates?|denotes|forms?|expresses|introduces|substitutes|links|marks|refers)\b/i;
+/** Inflected forms that collide with a rare noun/interjection (French "est" = east) count as the inflection. */
+const WEAK_LEMMA_POS = new Set(['n', 'intj']);
+const STRONG_TARGET_POS = new Set(['v', 'art', 'det', 'pron']);
 
 const lower = (s: string) => s.toLocaleLowerCase();
 
@@ -49,6 +55,8 @@ interface LemmaRecord {
   pos: string;
   glosses: string[];
   forms: Set<string>;
+  /** True once a lowercase spelling has been seen ("a" vs "A", "ce" vs "CE"). */
+  lowercase: boolean;
 }
 
 /** Glosses and form→lemma links aggregated from wiktextract JSONL entries. */
@@ -64,6 +72,9 @@ export class WikiIndex {
 
     for (const sense of entry.senses ?? []) {
       const targets = [...(sense.form_of ?? []), ...(sense.alt_of ?? [])].map((t) => lower(t.word)).filter(Boolean);
+      // Italian clitic compounds: "compound of the infinitive trovare with mi".
+      const compound = /^compound of (?:the )?(?:[a-z]+ )*?(\p{L}+) with /iu.exec(sense.glosses?.at(-1) ?? '');
+      if (compound) targets.push(lower(compound[1]));
       if (targets.length) {
         let set = this.formOf.get(key);
         if (!set) this.formOf.set(key, (set = new Set()));
@@ -76,9 +87,16 @@ export class WikiIndex {
     }
     if (!glosses.length) return;
 
+    const isLower = entry.word === key;
     let rec = this.lemmas.get(key);
-    if (!rec) this.lemmas.set(key, (rec = { display: entry.word, pos, glosses: [], forms: new Set() }));
-    for (const g of glosses) if (rec.glosses.length < MAX_GLOSSES && !rec.glosses.includes(g)) rec.glosses.push(g);
+    if (!rec) {
+      this.lemmas.set(key, (rec = { display: entry.word, pos, glosses, forms: new Set(), lowercase: isLower }));
+    } else if (isLower && !rec.lowercase) {
+      // Prefer the lowercase word's meaning over an abbreviation or proper noun ("a" over "A").
+      Object.assign(rec, { display: entry.word, pos, glosses: [...glosses, ...rec.glosses], lowercase: true });
+    } else {
+      rec.glosses.push(...glosses);
+    }
     for (const f of entry.forms ?? []) {
       if (!f.form || /\s/.test(f.form) || f.tags?.some((t) => SKIP_FORM_TAGS.has(t))) continue;
       const lf = lower(f.form);
@@ -96,6 +114,9 @@ export function cleanGloss(raw: string | undefined): string | null {
   if (!raw) return null;
   let g = raw.replace(/\s+/g, ' ').trim().replace(/\.$/, '');
   if (!g || /^(alternative|obsolete|archaic|misspelling|abbreviation) (form|spelling|of)/i.test(g)) return null;
+  if (/^the name of the latin(-| )script letter/i.test(g) || /^compound of /i.test(g)) return null;
+  // Drop parenthetical asides from longer glosses: "American (of or relating to the USA)".
+  if (g.length > 30) g = g.replace(/\s*\([^()]*\)/g, '').trim() || g;
   if (g.length > MAX_GLOSS_LEN) {
     // Prefer the first clause of long, sentence-like glosses.
     const cut = g.slice(0, MAX_GLOSS_LEN);
@@ -115,6 +136,21 @@ export function parseFrequencyList(text: string): [string, number][] {
   return out;
 }
 
+/** Picks up to three short, translation-like glosses, keeping Wiktionary's sense order otherwise. */
+export function pickGlosses(glosses: string[]): string {
+  const unique = [...new Set(glosses)];
+  const good = unique.filter((g) => !DESCRIPTIVE.test(g));
+  const ordered = [...good.filter((g) => g.length <= 30), ...good.filter((g) => g.length > 30), ...unique.filter((g) => DESCRIPTIVE.test(g))];
+  const out: string[] = [];
+  let len = 0;
+  for (const g of ordered) {
+    if (out.length >= MAX_GLOSSES || (out.length && len + g.length > MAX_TOTAL_GLOSS)) break;
+    out.push(g);
+    len += g.length + 2;
+  }
+  return out.join('; ');
+}
+
 /**
  * Ranks lemmas by the summed frequency of their surface forms. A surface form that is itself a
  * lemma counts for that lemma; otherwise it counts for the lemma it inflects. Only forms that
@@ -130,17 +166,26 @@ export function rankLemmas(freq: [string, number][], wiki: WikiIndex, limit: num
     s.add(form);
   };
 
+  const dropped = new Set<string>();
   for (const [w, c] of freq) {
     if (/\d/.test(w)) continue;
+    const formTarget = [...(wiki.formOf.get(w) ?? [])].find((t) => wiki.lemmas.has(t) && t !== w);
     let target: string | undefined;
-    if (wiki.lemmas.has(w)) target = w;
-    else target = [...(wiki.formOf.get(w) ?? [])].find((t) => wiki.lemmas.has(t));
+    const own = wiki.lemmas.get(w);
+    if (own && formTarget && WEAK_LEMMA_POS.has(own.pos) && STRONG_TARGET_POS.has(wiki.lemmas.get(formTarget)!.pos)) {
+      // "est" is far more likely "is" (être) than "east"; drop the noun so the app resolves the form.
+      target = formTarget;
+      dropped.add(w);
+    } else {
+      target = own ? w : formTarget;
+    }
     if (!target) continue;
     credit.set(target, (credit.get(target) ?? 0) + c);
     addForm(target, w);
   }
 
   return [...credit.entries()]
+    .filter(([key]) => !dropped.has(key))
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([key], i) => {
@@ -148,7 +193,7 @@ export function rankLemmas(freq: [string, number][], wiki: WikiIndex, limit: num
       const forms = [...(seenForms.get(key) ?? [])].slice(0, 40);
       return {
         lemma: rec.display,
-        gloss: rec.glosses.join('; '),
+        gloss: pickGlosses(rec.glosses),
         pos: rec.pos,
         rank: i + 1,
         ...(forms.length ? { forms } : {}),

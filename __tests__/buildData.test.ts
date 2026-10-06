@@ -1,4 +1,4 @@
-import { cleanGloss, parseFrequencyList, rankLemmas, selectSentences, toGenerated, WikiIndex } from '../tools/build-data/lib';
+import { cleanGloss, parseFrequencyList, pickGlosses, rankLemmas, selectSentences, toGenerated, WikiIndex } from '../tools/build-data/lib';
 import { DictIndex } from '@/lib/dictionary';
 
 function wiki() {
@@ -28,6 +28,7 @@ describe('WikiIndex', () => {
   it('collects glosses, forms and form-of links, skipping names and phrases', () => {
     const w = wiki();
     expect(w.lemmas.get('tener')?.glosses).toEqual(['to have', 'to hold']);
+    expect(w.lemmas.get('tener')?.lowercase).toBe(true);
     expect([...w.lemmas.get('tener')!.forms]).toEqual(['tengo', 'tiene']);
     expect([...w.formOf.get('tengo')!]).toEqual(['tener']);
     expect(w.lemmas.has('juan')).toBe(false);
@@ -42,6 +43,40 @@ describe('cleanGloss', () => {
     const g = cleanGloss('used to express something, especially in very long and rambling dictionary definitions')!;
     expect(g.length).toBeLessThanOrEqual(60);
     expect(g).toBe('used to express something');
+  });
+});
+
+describe('gloss and lemma quality', () => {
+  it('prefers short translations over grammar descriptions and letter names', () => {
+    expect(pickGlosses(['Used as a copula. to be', 'to be', 'to exist'])).toBe('to be; to exist; Used as a copula. to be');
+    expect(cleanGloss('The name of the Latin script letter D/d')).toBeNull();
+    expect(cleanGloss('American, U.S. American (of or relating to the United States of America)')).toBe('American, U.S. American');
+  });
+
+  it('prefers the lowercase word when spellings collide', () => {
+    const w = new WikiIndex();
+    w.add({ word: 'A', pos: 'noun', senses: [{ glosses: ['bishop'] }] });
+    w.add({ word: 'a', pos: 'prep', senses: [{ glosses: ['to'] }] });
+    expect(w.lemmas.get('a')).toMatchObject({ display: 'a', pos: 'prep' });
+    expect(w.lemmas.get('a')!.glosses[0]).toBe('to');
+  });
+
+  it('treats a rare noun that is also a verb form as the verb form', () => {
+    const w = new WikiIndex();
+    w.add({ word: 'être', pos: 'verb', senses: [{ glosses: ['to be'] }] });
+    w.add({ word: 'est', pos: 'noun', senses: [{ glosses: ['east'] }] });
+    w.add({ word: 'est', pos: 'verb', senses: [{ glosses: ['third-person singular of être'], form_of: [{ word: 'être' }] }] });
+    const entries = rankLemmas([['est', 100], ['être', 5]], w, 10);
+    expect(entries.map((e) => e.lemma)).toEqual(['être']);
+    expect(entries[0].forms).toEqual(['est']);
+  });
+
+  it('maps Italian clitic compounds to their infinitive', () => {
+    const w = new WikiIndex();
+    w.add({ word: 'trovare', pos: 'verb', senses: [{ glosses: ['to find'] }] });
+    w.add({ word: 'trovarmi', pos: 'verb', senses: [{ glosses: ['compound of the infinitive trovare with mi'] }] });
+    expect(w.lemmas.has('trovarmi')).toBe(false);
+    expect([...w.formOf.get('trovarmi')!]).toEqual(['trovare']);
   });
 });
 
