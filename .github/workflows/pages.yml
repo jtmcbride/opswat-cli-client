@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [claude/language-learning-app-plan-vivifx]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
