@@ -68,6 +68,14 @@ export function newSrs(now = Date.now()): SrsState {
   return { state: 'new', stability: 0, difficulty: 0, reps: 0, lapses: 0, due: now };
 }
 
+/**
+ * State for a word the learner already knows (e.g. from a placement test): treated as reviewed
+ * today with a month of stability, first check-in after `dueInDays`.
+ */
+export function knownSrs(now: number, dueInDays: number): SrsState {
+  return { state: 'review', stability: 30, difficulty: 4, reps: 1, lapses: 0, lastReview: now, due: now + dueInDays * DAY };
+}
+
 /** Pure: the next state for a card given a grade. */
 export function schedule(state: SrsState, grade: Grade, now = Date.now(), opts: ScheduleOptions = {}): SrsState {
   const retention = opts.retention ?? 0.9;

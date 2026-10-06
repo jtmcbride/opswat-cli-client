@@ -157,7 +157,11 @@ export default function WordsScreen() {
       {words.length < 20 && index && index.size > 0 && (
         <Card>
           <T variant="heading">Just starting?</T>
-          <T variant="muted">Add the most common words from the dictionary. You can remove any you don&apos;t know.</T>
+          <T variant="muted">
+            Already know some words? Take a 2-minute placement test. Or add the most common words and remove any you
+            don&apos;t know.
+          </T>
+          <Button title="Placement test" icon="school-outline" onPress={() => router.push('/placement')} />
           <Row>
             <Button compact variant="secondary" title="+ 25 words" onPress={() => addStarter(25)} />
             <Button compact variant="secondary" title="+ 100 words" onPress={() => addStarter(100)} />

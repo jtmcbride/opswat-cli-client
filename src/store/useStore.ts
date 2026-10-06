@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { BUILTIN_LANGUAGES } from '@/data';
 import { DEFAULT_MODEL, type ChatTurn } from '@/lib/ai';
-import { migrateSrs, newSrs, schedule } from '@/lib/srs';
+import { knownSrs, migrateSrs, newSrs, schedule } from '@/lib/srs';
 import { normalize } from '@/lib/tokenize';
 import type {
   CustomLanguage,
@@ -36,7 +36,7 @@ export interface AppState {
 
   setSettings: (patch: Partial<Settings>) => void;
   addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
-  addWords: (lang: LangCode, items: { word: string; gloss: string }[]) => number;
+  addWords: (lang: LangCode, items: { word: string; gloss: string }[], opts?: { known?: boolean }) => number;
   updateWord: (id: string, patch: Partial<Pick<KnownWord, 'word' | 'gloss' | 'suspended'>>) => void;
   removeWord: (id: string) => void;
   gradeWord: (id: string, grade: Grade) => void;
@@ -105,7 +105,7 @@ export const useStore = create<AppState>()(
         return kw;
       },
 
-      addWords: (lang, items) => {
+      addWords: (lang, items, opts) => {
         const seen = new Set(get().words.filter((k) => k.lang === lang).map((k) => normalize(k.word)));
         const now = Date.now();
         const added: KnownWord[] = [];
@@ -113,7 +113,9 @@ export const useStore = create<AppState>()(
           const n = normalize(word);
           if (!n || seen.has(n)) continue;
           seen.add(n);
-          added.push({ id: uid(), lang, word: word.trim(), gloss: gloss.trim(), addedAt: now, srs: newSrs(now) });
+          // Already-known words skip the new-card queue; their first check-ins are spread over 1–8 weeks.
+          const srs = opts?.known ? knownSrs(now, 7 + ((added.length * 7) % 50)) : newSrs(now);
+          added.push({ id: uid(), lang, word: word.trim(), gloss: gloss.trim(), addedAt: now, srs });
         }
         if (added.length) set((s) => ({ words: [...s.words, ...added] }));
         return added.length;

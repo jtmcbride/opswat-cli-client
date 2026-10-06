@@ -94,6 +94,9 @@ export default function SettingsScreen() {
         <Link href="/dictionaries" asChild>
           <Button variant="secondary" icon="book" title="Manage dictionaries" />
         </Link>
+        <Link href="/placement" asChild>
+          <Button variant="secondary" icon="school-outline" title="Placement test" />
+        </Link>
       </Card>
 
       <Card>
