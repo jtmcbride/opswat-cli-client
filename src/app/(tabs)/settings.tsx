@@ -1,10 +1,13 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, Platform, Switch } from 'react-native';
 
+import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
 import { useTheme } from '@/constants/theme';
+import { builtinDictionary } from '@/data';
 import { useApiKey } from '@/hooks/useApiKey';
+import { useCanSpeak } from '@/hooks/useSpeech';
 import { DEFAULT_MODEL } from '@/lib/ai';
 import { pickTextFile, shareText } from '@/lib/files';
 import type { ReviewDirection } from '@/lib/types';
@@ -39,6 +42,8 @@ export default function SettingsScreen() {
   const [native, setNative] = useState(settings.nativeLang);
   const [model, setModel] = useState(settings.aiModel);
   const [message, setMessage] = useState<string | null>(null);
+  const canSpeak = useCanSpeak(settings.activeLang);
+  const sample = builtinDictionary(settings.activeLang)?.sentences[0]?.text ?? languageName(settings.activeLang, custom);
 
   const exportBackup = async () => {
     const s = useStore.getState();
@@ -102,6 +107,32 @@ export default function SettingsScreen() {
             />
           ))}
         </Row>
+      </Card>
+
+      <Card>
+        <T variant="heading">Pronunciation</T>
+        {canSpeak ? (
+          <>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <T>Try it</T>
+              <SpeakButton text={sample} lang={settings.activeLang} id="settings-sample" />
+            </Row>
+            <Row>
+              <Chip label="Normal speed" selected={settings.speechRate === 'normal'} onPress={() => setSettings({ speechRate: 'normal' })} />
+              <Chip label="Slow" selected={settings.speechRate === 'slow'} onPress={() => setSettings({ speechRate: 'slow' })} />
+            </Row>
+            <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+              <T style={{ flex: 1 }}>Read words aloud on flashcards</T>
+              <Switch value={settings.autoSpeak} onValueChange={(v) => setSettings({ autoSpeak: v })} />
+            </Row>
+            <T variant="small">Uses your device&apos;s voices. Long-press any speaker button to hear it slowly.</T>
+          </>
+        ) : (
+          <T variant="muted">
+            No {languageName(settings.activeLang, custom)} voice is available on this device. Install one in your
+            system&apos;s text-to-speech or language settings, then reopen the app.
+          </T>
+        )}
       </Card>
 
       <Card>

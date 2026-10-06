@@ -15,6 +15,10 @@ device.
   multiple choice or tap to reveal, then add the word to your list. Tap any word for its meaning.
 - **Chat** (optional): an AI conversation partner that writes mostly with your known words and
   introduces one or two new ones per reply. It can also generate fresh practice sentences.
+- **Pronunciation**: speaker buttons on words, flashcards, Learn sentences, and chat replies use the
+  device's text-to-speech voices (`expo-speech`; works offline on iOS/Android, Web Speech API in
+  browsers). Long-press for slow speech; optional auto-play on flashcards. Buttons hide when the device
+  has no voice for the language.
 - **Dictionaries**: built-in Spanish, French, German, Italian, and Portuguese (≈200–250 common
   words and ≈120 sentences each). Import your own dictionary as CSV, TSV, JSON, or an Anki text
   export, for any language.

@@ -67,4 +67,7 @@ export interface Settings {
   nativeLang: string;
   reviewDirection: ReviewDirection;
   aiModel: string;
+  speechRate: 'normal' | 'slow';
+  /** Speak the word automatically when a flashcard shows it. */
+  autoSpeak: boolean;
 }

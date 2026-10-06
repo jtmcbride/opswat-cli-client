@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
+import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Input, Row, Screen, T } from '@/components/ui';
 import { useStore } from '@/store/useStore';
 
@@ -29,7 +30,10 @@ export default function EditWordScreen() {
   return (
     <Screen edges={['bottom']}>
       <Card>
-        <T variant="small">Word</T>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <T variant="small">Word</T>
+          <SpeakButton text={text} lang={word.lang} />
+        </Row>
         <Input value={text} onChangeText={setText} />
         <T variant="small">Meaning</T>
         <Input value={gloss} onChangeText={setGloss} />

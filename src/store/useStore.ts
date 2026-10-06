@@ -63,6 +63,8 @@ export const useStore = create<AppState>()(
         nativeLang: 'English',
         reviewDirection: 'target',
         aiModel: DEFAULT_MODEL,
+        speechRate: 'normal',
+        autoSpeak: false,
       },
       customLanguages: [],
       words: [],
@@ -163,6 +165,11 @@ export const useStore = create<AppState>()(
       name: 'lingo.state',
       version: 1,
       storage: createJSONStorage(() => AsyncStorage),
+      // Deep-merge settings so fields added in later versions get their defaults.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<AppState>;
+        return { ...current, ...p, settings: { ...current.settings, ...p.settings } };
+      },
       partialize: ({ settings, customLanguages, words, userDicts, recentSentences, extraSentences, chats }) => ({
         settings,
         customLanguages,

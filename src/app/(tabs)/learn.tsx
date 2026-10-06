@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { glossFor, Sentence } from '@/components/Sentence';
+import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Empty, Row, Screen, T } from '@/components/ui';
 import { radius, space, useTheme } from '@/constants/theme';
 import { useApiKey } from '@/hooks/useApiKey';
@@ -177,12 +178,17 @@ function LearnSession({ lang }: { lang: string }) {
           target={exercise.target}
           onWordPress={(word, ls) => setPeek({ word, gloss: glossFor(index, word, ls, exercise.sentence.glosses) })}
         />
+        <Row>
+          <SpeakButton text={exercise.sentence.text} lang={lang} id={`sentence:${exercise.sentenceIndex}`} />
+          <SpeakButton text={exercise.sentence.text} lang={lang} rate="slow" id={`sentence-slow:${exercise.sentenceIndex}`} />
+        </Row>
         {peek && (
           <Pressable onPress={() => setPeek(null)} style={[styles.peek, { backgroundColor: t.surfaceAlt }]}>
             <T style={{ fontWeight: '600' }}>{peek.word}</T>
             <T variant="muted" style={{ flex: 1 }}>
               {peek.gloss ?? 'Not in dictionary'}
             </T>
+            <SpeakButton text={peek.word} lang={lang} size={20} />
           </Pressable>
         )}
         {otherUnknown > 0 && (

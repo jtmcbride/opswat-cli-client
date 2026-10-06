@@ -4,6 +4,7 @@ import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View }
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { glossFor, Sentence } from '@/components/Sentence';
+import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Empty, Input, Row, Screen, T } from '@/components/ui';
 import { MAX_WIDTH, radius, space, useTheme } from '@/constants/theme';
 import { useApiKey } from '@/hooks/useApiKey';
@@ -101,7 +102,7 @@ export default function ChatScreen() {
               <Button title="Start a conversation" onPress={start} loading={sending} />
             </Empty>
           }
-          renderItem={({ item }) =>
+          renderItem={({ item, index: i }) =>
             item.role === 'user' ? (
               <View style={[styles.bubble, styles.user, { backgroundColor: t.primary }]}>
                 <T style={{ color: t.primaryText }}>{item.text}</T>
@@ -121,6 +122,9 @@ export default function ChatScreen() {
                 ) : (
                   <T>{item.text}</T>
                 )}
+                <View style={{ alignSelf: 'flex-end', marginTop: space.xs }}>
+                  <SpeakButton text={item.text} lang={lang} size={18} id={`chat:${i}`} />
+                </View>
               </View>
             )
           }
@@ -144,6 +148,7 @@ export default function ChatScreen() {
               <T style={{ fontWeight: '600' }}>{peek.lemma}</T>
               <T variant="muted">{peek.gloss ?? 'Not in dictionary'}</T>
             </View>
+            <SpeakButton text={peek.word} lang={lang} size={20} />
             {peek.gloss && (
               <Button
                 compact

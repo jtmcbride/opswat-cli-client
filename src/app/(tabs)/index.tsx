@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, T } from '@/components/ui';
 import { MAX_WIDTH, space, useTheme } from '@/constants/theme';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
@@ -203,6 +204,7 @@ function WordRow({ word }: { word: KnownWord }) {
           {word.gloss || '(no meaning)'}
         </T>
       </View>
+      <SpeakButton text={word.word} lang={word.lang} size={20} id={`word:${word.id}`} />
       {due && <View style={[styles.dot, { backgroundColor: t.accent }]} />}
       <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
     </Pressable>

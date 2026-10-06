@@ -1,10 +1,12 @@
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Empty, Row, Screen, T } from '@/components/ui';
 import { radius, space, useTheme } from '@/constants/theme';
 import { useNow } from '@/hooks/useNow';
+import { speak } from '@/lib/speech';
 import { isDue, previewInterval } from '@/lib/srs';
 import type { Grade, KnownWord } from '@/lib/types';
 import { useStore } from '@/store/useStore';
@@ -49,6 +51,15 @@ export default function ReviewScreen() {
     return false;
   }, [card, direction]);
 
+  // Optionally pronounce the word as soon as its side of the card is visible.
+  const autoSpeak = useStore((s) => s.settings.autoSpeak);
+  const speechRate = useStore((s) => s.settings.speechRate);
+  const wordVisible = !!card && (!showNativeFirst || revealed);
+  useEffect(() => {
+    if (autoSpeak && wordVisible && card) void speak(card.word, card.lang, { id: `card:${card.id}`, rate: speechRate });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSpeak, wordVisible, card?.id]);
+
   if (words.length === 0) {
     return (
       <Screen>
@@ -89,12 +100,14 @@ export default function ReviewScreen() {
         <Card style={styles.card}>
           <T variant="small">{showNativeFirst ? 'Meaning' : 'Word'}</T>
           <T variant="big">{front}</T>
+          {!showNativeFirst && <SpeakButton text={card.word} lang={card.lang} size={28} id={`card:${card.id}`} />}
           {revealed ? (
             <>
               <View style={[styles.divider, { backgroundColor: t.border }]} />
               <T variant="big" style={{ fontSize: 24, fontWeight: '400' }}>
                 {back}
               </T>
+              {showNativeFirst && <SpeakButton text={card.word} lang={card.lang} size={28} id={`card:${card.id}`} />}
             </>
           ) : (
             <T variant="small" style={{ textAlign: 'center' }}>
