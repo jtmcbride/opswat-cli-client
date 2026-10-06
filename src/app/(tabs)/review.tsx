@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { MilestoneBanner } from '@/components/Celebrations';
 import { ExplainButton } from '@/components/ExplainButton';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Empty, Input, Row, Screen, T } from '@/components/ui';
@@ -108,6 +109,7 @@ export default function ReviewScreen() {
           body={body || undefined}>
           <Button title="Learn new words" icon="bulb" onPress={() => router.navigate('/learn')} />
         </Empty>
+        <MilestoneBanner lang={lang} />
       </Screen>
     );
   }

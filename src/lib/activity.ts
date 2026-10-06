@@ -131,3 +131,34 @@ export function calendar(days: Record<string, DayActivity> | undefined, now: num
 export function goalDays(days: Record<string, DayActivity> | undefined, now: number, goal: number, count = 30): number {
   return lastDays(days, now, count).filter((d) => d.reviews >= Math.max(1, goal)).length;
 }
+
+export interface WeekStats {
+  /** Day key of the week's Monday. */
+  start: string;
+  reviews: number;
+  again: number;
+  added: number;
+  /** Days with at least one review. */
+  activeDays: number;
+  goalDays: number;
+  /** Days of the week so far (7 for past weeks). */
+  length: number;
+}
+
+/** Totals for the Monday–Sunday week `weeksAgo` weeks back (0 = this week, through today). */
+export function weekStats(days: Record<string, DayActivity> | undefined, now: number, weeksAgo: number, goal: number): WeekStats {
+  const sinceMonday = (new Date(now).getDay() + 6) % 7;
+  const mondayOffset = sinceMonday + weeksAgo * 7; // days before today
+  const length = weeksAgo === 0 ? sinceMonday + 1 : 7;
+  const stats: WeekStats = { start: dayKeyOffset(now, mondayOffset), reviews: 0, again: 0, added: 0, activeDays: 0, goalDays: 0, length };
+  for (let i = 0; i < length; i++) {
+    const d = days?.[dayKeyOffset(now, mondayOffset - i)];
+    if (!d) continue;
+    stats.reviews += d.reviews;
+    stats.again += d.again;
+    stats.added += d.added;
+    if (d.reviews > 0) stats.activeDays++;
+    if (d.reviews >= Math.max(1, goal)) stats.goalDays++;
+  }
+  return stats;
+}

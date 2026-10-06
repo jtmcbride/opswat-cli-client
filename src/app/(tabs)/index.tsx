@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MilestoneBanner, WeeklyRecap } from '@/components/Celebrations';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, T } from '@/components/ui';
 import { MAX_WIDTH, space, useTheme } from '@/constants/theme';
@@ -128,6 +129,8 @@ export default function WordsScreen() {
         </View>
         <Ionicons name="stats-chart" size={18} color={t.textMuted} />
       </Pressable>
+      <MilestoneBanner lang={lang} />
+      <WeeklyRecap lang={lang} />
       <Row style={{ justifyContent: 'space-between' }}>
         <T variant="muted">
           {words.length} words · {dueCount} to study

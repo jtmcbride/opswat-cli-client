@@ -41,6 +41,10 @@ export interface AppState {
   activity: ActivityLog;
   /** Every review, by local day, for fitting the scheduler to this learner. */
   reviewLog: Record<string, ReviewEntry[]>;
+  /** Milestone ids already celebrated (or reached before milestones existed), per language. */
+  celebrated: Record<LangCode, string[]>;
+  /** Monday (day key) of the week whose recap was dismissed, per language. */
+  weeklySeen: Record<LangCode, string>;
 
   setSettings: (patch: Partial<Settings>) => void;
   addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
@@ -59,6 +63,8 @@ export interface AppState {
   addTextGlosses: (id: string, glosses: Record<string, string>) => void;
   removeText: (id: string) => void;
   restore: (backup: Backup) => void;
+  markCelebrated: (lang: LangCode, ids: string[]) => void;
+  dismissWeekly: (lang: LangCode, weekStart: string) => void;
 }
 
 export type Backup = Pick<
@@ -109,6 +115,8 @@ export const useStore = create<AppState>()(
       texts: [],
       activity: {},
       reviewLog: {},
+      celebrated: {},
+      weeklySeen: {},
 
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
@@ -230,6 +238,11 @@ export const useStore = create<AppState>()(
 
       removeText: (id) => set((s) => ({ texts: s.texts.filter((t) => t.id !== id) })),
 
+      markCelebrated: (lang, ids) =>
+        set((s) => ({ celebrated: { ...s.celebrated, [lang]: [...new Set([...(s.celebrated[lang] ?? []), ...ids])] } })),
+
+      dismissWeekly: (lang, weekStart) => set((s) => ({ weeklySeen: { ...s.weeklySeen, [lang]: weekStart } })),
+
       restore: (backup) => {
         for (const [id, entries] of Object.entries(backup.dictEntries ?? {})) void saveDictEntries(id, entries);
         set({
@@ -278,6 +291,8 @@ export const useStore = create<AppState>()(
         texts,
         activity,
         reviewLog,
+        celebrated,
+        weeklySeen,
       }) => ({
         settings,
         customLanguages,
@@ -290,6 +305,8 @@ export const useStore = create<AppState>()(
         texts,
         activity,
         reviewLog,
+        celebrated,
+        weeklySeen,
       }),
     },
   ),

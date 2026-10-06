@@ -1,14 +1,17 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import { ColumnChart, type Column } from '@/components/ColumnChart';
+import { weekRows } from '@/components/Celebrations';
 import { CoverageBar } from '@/components/CoverageBar';
 import { ActivityCalendar, STRENGTH_HELP, StrengthBar } from '@/components/ProgressCharts';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { space, useTheme } from '@/constants/theme';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
+import { useMilestones } from '@/hooks/useMilestones';
 import { useNow } from '@/hooks/useNow';
-import { bestStreak, calendar, forecast, goalDays, lastDays, retentionRate, streak } from '@/lib/activity';
+import { bestStreak, calendar, forecast, goalDays, lastDays, retentionRate, streak, weekStats } from '@/lib/activity';
 import { corpusCoverage } from '@/lib/coverage';
 import { withArticle } from '@/lib/grammar';
 import { directions } from '@/lib/queue';
@@ -53,10 +56,13 @@ export default function StatsScreen() {
   const coverage = useMemo(() => (index ? corpusCoverage(sentences, index, lemmas) : null), [sentences, index, lemmas]);
   const strength = useMemo(() => strengthCounts(words), [words]);
   const weeks = useMemo(() => calendar(days, now, CALENDAR_WEEKS, goal), [days, now, goal]);
+  const thisWeek = weekStats(days, now, 0, goal);
+  const week = weekRows(thisWeek, weekStats(days, now, 1, goal));
+  const addedWeek = thisWeek.added;
+  const { tracks } = useMilestones(lang);
 
   const last14 = useMemo(() => lastDays(days, now, 14), [days, now]);
   const today = last14.at(-1)!;
-  const addedWeek = last14.slice(-7).reduce((s, d) => s + d.added, 0);
   const reviews30 = lastDays(days, now, 30).reduce((s, d) => s + d.reviews, 0);
   const retention = retentionRate(days, now);
   const upcoming = useMemo(
@@ -109,6 +115,30 @@ export default function StatsScreen() {
       </Card>
 
       <Card>
+        <T variant="heading">This week</T>
+        <Row style={{ flexWrap: 'nowrap' }}>
+          <View style={{ flex: 1 }} />
+          <T variant="small" style={{ width: 90, textAlign: 'right' }}>
+            So far
+          </T>
+          <T variant="small" style={{ width: 90, textAlign: 'right' }}>
+            Last week
+          </T>
+        </Row>
+        {week.map((r) => (
+          <Row key={r.label} style={{ flexWrap: 'nowrap', borderTopWidth: 1, borderColor: t.surfaceAlt, paddingTop: space.xs }}>
+            <T variant="muted" style={{ flex: 1 }}>
+              {r.label}
+            </T>
+            <T style={{ width: 90, textAlign: 'right', fontWeight: '600' }}>{r.cur}</T>
+            <T variant="muted" style={{ width: 90, textAlign: 'right' }}>
+              {r.prev}
+            </T>
+          </Row>
+        ))}
+      </Card>
+
+      <Card>
         <T variant="heading">Activity</T>
         <T variant="small">Last {CALENDAR_WEEKS} weeks</T>
         <ActivityCalendar weeks={weeks} goal={goal} />
@@ -151,6 +181,37 @@ export default function StatsScreen() {
               })}
             </>
           )}
+        </Card>
+      )}
+
+      {tracks.length > 0 && (
+        <Card>
+          <T variant="heading">Milestones</T>
+          {tracks.map((tr) => (
+            <View key={tr.id} style={{ gap: 4, borderTopWidth: 1, borderColor: t.surfaceAlt, paddingTop: space.sm }}>
+              <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                <T style={{ fontWeight: '600', flex: 1 }}>{tr.name}</T>
+                {tr.reached && (
+                  <Row style={{ gap: 4 }}>
+                    <Ionicons name="trophy" size={14} color={t.accent} />
+                    <T variant="small">{tr.reached.title}</T>
+                  </Row>
+                )}
+              </Row>
+              {tr.next ? (
+                <>
+                  <View style={{ height: 6, borderRadius: 3, backgroundColor: t.surfaceAlt, overflow: 'hidden' }}>
+                    <View style={{ width: `${Math.min(1, tr.next.share) * 100}%`, height: '100%', backgroundColor: t.primary }} />
+                  </View>
+                  <T variant="small">
+                    Next: {tr.next.milestone.title} · {tr.next.value} / {tr.next.target}
+                  </T>
+                </>
+              ) : (
+                <T variant="small">All milestones reached!</T>
+              )}
+            </View>
+          ))}
         </Card>
       )}
 

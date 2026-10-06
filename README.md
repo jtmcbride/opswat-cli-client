@@ -33,7 +33,9 @@ device unless you turn on sync.
 - **Progress**: streak and daily review goal on the Words tab; a Progress screen with current and
   best streak, goal days, retention, a 16-week activity calendar, vocabulary strength (new →
   mastered, per direction), everyday coverage (share of words in everyday sentences you know, plus
-  the most common words to learn next), reviews per day, upcoming reviews and words added. Optional
+  the most common words to learn next), this week vs last week, milestones (words, mastered words,
+  streak, reviews, coverage) with celebrations as you reach them, reviews per day, upcoming reviews
+  and words added. A recap of last week appears on the Words tab when a new week starts. Optional
   daily reminder (iOS/Android) that skips days you've already met your goal and mentions the
   streak at stake.
 - **Dictionaries**: built-in Spanish, French, German, Italian, Portuguese and Croatian with 5,000
