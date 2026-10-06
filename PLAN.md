@@ -1,5 +1,7 @@
 # Lingo — Language Learning App: Plan
 
+> **Status:** v1 implemented. See "Implementation notes" at the end for where it differs from this plan.
+
 A simple, mobile-first vocabulary app (Anki-like). Track words you know, drill them with
 spaced-repetition flashcards, learn new words from context, and optionally chat with an AI tutor.
 
@@ -84,3 +86,22 @@ Each milestone = its own commit(s) with tests for the core logic.
 - Which languages first (default: ES/FR/DE/IT/PT, English as native)?
 - AI provider: Anthropic only with user's key, or a small proxy server so users don't need a key?
 - Accounts / cloud sync — out of scope for v1?
+
+## 8. Implementation notes (v1)
+
+Decisions taken (defaults accepted): Expo for native + web; ES/FR/DE/IT/PT with English as native;
+Anthropic with the user's own key; no accounts or sync.
+
+Differences from the plan:
+
+- **Storage:** zustand persisted to AsyncStorage (localStorage on web) instead of SQLite. Simpler,
+  works identically on web, and is fine at vocabulary scale. Imported dictionaries are stored under
+  separate keys. Swap in SQLite if a dictionary gets into the hundreds of thousands of entries.
+- **Built-in content:** the network policy here blocked Tatoeba/Wiktionary downloads, so the
+  built-in dictionaries (≈200–250 words) and sentences (≈120 per language) were written by hand.
+  A test checks that every sentence word resolves to a dictionary entry. Next step: a `tools/`
+  script to build larger dictionaries from openly licensed data.
+- **Flashcards:** one card per word with a direction setting (word→meaning / meaning→word / mixed)
+  rather than separate SRS state per direction.
+- **AI:** non-streaming requests with server-side refusal fallback enabled; also used to generate
+  new i+1 sentences (with per-word glosses) when the built-in sentences run out.

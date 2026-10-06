@@ -1,0 +1,103 @@
+import { normalize, splitElision, tokenize } from './tokenize';
+import type { DictEntry } from './types';
+
+/** Fast lookup over one or more dictionaries for a language. Later sources override earlier ones. */
+export class DictIndex {
+  readonly entries: DictEntry[] = [];
+  private byLemma = new Map<string, DictEntry>();
+  private formToLemma = new Map<string, string>();
+
+  constructor(sources: DictEntry[][]) {
+    let rank = 0;
+    for (const source of sources) {
+      for (const raw of source) {
+        const lemma = normalize(raw.lemma);
+        if (!lemma) continue;
+        const entry: DictEntry = { ...raw, lemma: raw.lemma.trim(), rank: raw.rank ?? ++rank };
+        const existing = this.byLemma.get(lemma);
+        if (existing) {
+          // Keep the better (lower) frequency rank, take the newer gloss.
+          entry.rank = Math.min(existing.rank ?? Infinity, entry.rank ?? Infinity);
+          entry.forms = [...new Set([...(existing.forms ?? []), ...(entry.forms ?? [])])];
+          this.entries[this.entries.indexOf(existing)] = entry;
+        } else {
+          this.entries.push(entry);
+        }
+        this.byLemma.set(lemma, entry);
+        for (const f of entry.forms ?? []) {
+          const nf = normalize(f);
+          if (!this.formToLemma.has(nf)) this.formToLemma.set(nf, lemma);
+        }
+      }
+    }
+  }
+
+  get size() {
+    return this.entries.length;
+  }
+
+  get(lemma: string): DictEntry | undefined {
+    return this.byLemma.get(normalize(lemma));
+  }
+
+  /** Resolve a surface form (e.g. "tengo") to its normalized lemma key ("tener"). Returns the input if unknown. */
+  lemmaOf(word: string): string {
+    const n = normalize(word);
+    if (this.byLemma.has(n)) return n;
+    return this.formToLemma.get(n) ?? n;
+  }
+
+  lookup(word: string): DictEntry | undefined {
+    return this.byLemma.get(this.lemmaOf(word));
+  }
+
+  /** Prefix search on lemmas and forms, ranked by frequency. */
+  search(prefix: string, limit = 8): DictEntry[] {
+    const p = normalize(prefix);
+    if (!p) return [];
+    const hits = new Set<DictEntry>();
+    for (const e of this.entries) {
+      if (normalize(e.lemma).startsWith(p)) hits.add(e);
+    }
+    for (const [form, lemma] of this.formToLemma) {
+      if (form.startsWith(p)) {
+        const e = this.byLemma.get(lemma);
+        if (e) hits.add(e);
+      }
+    }
+    return [...hits]
+      .sort(
+        (a, b) =>
+          Number(normalize(b.lemma) === p) - Number(normalize(a.lemma) === p) ||
+          (a.rank ?? 1e9) - (b.rank ?? 1e9),
+      )
+      .slice(0, limit);
+  }
+
+  /** Lemmas of every word in a sentence. */
+  sentenceLemmas(text: string): string[] {
+    const out: string[] = [];
+    for (const t of tokenize(text)) {
+      if (!t.isWord) continue;
+      out.push(...this.tokenLemmas(t.norm));
+    }
+    return out;
+  }
+
+  /**
+   * Lemmas for one word token. Whole-token matches win ("aujourd'hui"); otherwise the token is
+   * split on hyphens ("allez-vous") and elisions ("c'est" -> "c'", "est").
+   */
+  tokenLemmas(norm: string): string[] {
+    if (this.knows(norm)) return [this.lemmaOf(norm)];
+    return norm
+      .split('-')
+      .filter(Boolean)
+      .flatMap((part) => (this.knows(part) ? [part] : splitElision(part)))
+      .map((part) => this.lemmaOf(part));
+  }
+
+  knows(word: string): boolean {
+    return this.lookup(word) !== undefined;
+  }
+}
