@@ -73,14 +73,13 @@ describe('gloss and lemma quality', () => {
     expect(w.lemmas.get('a')!.glosses[0]).toBe('to');
   });
 
-  it('treats a rare noun that is also a verb form as the verb form', () => {
+  it('keeps nouns that are also verb forms ("casa" = house / form of "casar")', () => {
     const w = new WikiIndex();
-    w.add({ word: 'être', pos: 'verb', senses: [{ glosses: ['to be'] }] });
-    w.add({ word: 'est', pos: 'noun', senses: [{ glosses: ['east'] }] });
-    w.add({ word: 'est', pos: 'verb', senses: [{ glosses: ['third-person singular of être'], form_of: [{ word: 'être' }] }] });
-    const entries = rankLemmas([['est', 100], ['être', 5]], w, 10);
-    expect(entries.map((e) => e.lemma)).toEqual(['être']);
-    expect(entries[0].forms).toEqual(['est']);
+    w.add({ word: 'casar', pos: 'verb', senses: [{ glosses: ['to marry'] }] });
+    w.add({ word: 'casa', pos: 'noun', senses: [{ glosses: ['house'] }] });
+    w.add({ word: 'casa', pos: 'verb', senses: [{ glosses: ['third-person singular of casar'], form_of: [{ word: 'casar' }] }] });
+    const entries = rankLemmas([['casa', 100], ['casar', 5]], w, 10);
+    expect(entries.map((e) => e.lemma)).toEqual(['casa', 'casar']);
   });
 
   it('maps Italian clitic compounds to their infinitive', () => {

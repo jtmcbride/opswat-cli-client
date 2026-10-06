@@ -19,7 +19,7 @@ export interface WikiEntry {
   word: string;
   pos: string;
   senses?: WikiSense[];
-  forms?: { form: string; tags?: string[] }[];
+  forms?: { form: string; tags?: string[]; source?: string }[];
   head_templates?: { expansion?: string }[];
 }
 
@@ -66,9 +66,6 @@ const MAX_GLOSS_LEN = 60;
 const MAX_TOTAL_GLOSS = 70;
 /** Glosses that describe grammar rather than translate; used only if nothing better exists. */
 const DESCRIPTIVE = /^(used|indicates?|denotes|forms?|expresses|introduces|substitutes|links|marks|refers)\b/i;
-/** Inflected forms that collide with a rare noun/interjection (French "est" = east) count as the inflection. */
-const WEAK_LEMMA_POS = new Set(['n', 'intj']);
-const STRONG_TARGET_POS = new Set(['v', 'art', 'det', 'pron']);
 
 const lower = (s: string) => s.toLocaleLowerCase();
 
@@ -154,7 +151,10 @@ export function genderOf(entry: WikiEntry): string | undefined {
 export function inflectionTable(entry: WikiEntry): [string, string[]][] {
   const out: [string, string[]][] = [];
   const seen = new Set<string>();
-  for (const f of entry.forms ?? []) {
+  // Prefer the full conjugation/declension table; headword-line forms are only a summary of it.
+  const all = entry.forms ?? [];
+  const fromTables = all.filter((f) => f.source && /conjugation|declension|inflection/i.test(f.source));
+  for (const f of fromTables.length ? fromTables : all) {
     const tags = f.tags ?? [];
     if (!f.form || !tags.length || /\s/.test(f.form) || f.form === '-' || f.form === '—') continue;
     // Region names (capitalized tags like "Tuscany") mark regional variants.
@@ -224,26 +224,17 @@ export function rankLemmas(freq: [string, number][], wiki: WikiIndex, limit: num
     s.add(form);
   };
 
-  const dropped = new Set<string>();
+  // A word that is both a headword and an inflection ("casa" = house / form of "casar") counts as
+  // the headword. The app's curated starter lists decide the common exceptions ("est" is "être").
   for (const [w, c] of freq) {
     if (/\d/.test(w)) continue;
-    const formTarget = [...(wiki.formOf.get(w) ?? [])].find((t) => wiki.lemmas.has(t) && t !== w);
-    let target: string | undefined;
-    const own = wiki.lemmas.get(w);
-    if (own && formTarget && WEAK_LEMMA_POS.has(own.pos) && STRONG_TARGET_POS.has(wiki.lemmas.get(formTarget)!.pos)) {
-      // "est" is far more likely "is" (être) than "east"; drop the noun so the app resolves the form.
-      target = formTarget;
-      dropped.add(w);
-    } else {
-      target = own ? w : formTarget;
-    }
+    const target = wiki.lemmas.has(w) ? w : [...(wiki.formOf.get(w) ?? [])].find((t) => wiki.lemmas.has(t) && t !== w);
     if (!target) continue;
     credit.set(target, (credit.get(target) ?? 0) + c);
     addForm(target, w);
   }
 
   return [...credit.entries()]
-    .filter(([key]) => !dropped.has(key))
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([key], i) => {

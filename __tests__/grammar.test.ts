@@ -15,6 +15,16 @@ describe('withArticle', () => {
 });
 
 describe('groupInflections', () => {
+  it('names German subjunctives and merges indicative/headword duplicates', () => {
+    const sections = groupInflections('de', [
+      ['hat', ['present', 'singular', 'third-person']],
+      ['habe', ['first-person', 'indicative', 'present', 'singular']],
+      ['hätte', ['first-person', 'singular', 'subjunctive', 'subjunctive-ii']],
+    ]);
+    expect(sections.map((s) => s.title)).toEqual(['Present', 'Subjunctive II']);
+    expect(sections[0].rows.map((r) => r.label)).toEqual(['er/sie/es', 'ich']);
+  });
+
   it('groups conjugations by tense with pronoun rows, and other forms separately', () => {
     const sections = groupInflections('es', [
       ['tener', ['infinitive']],
@@ -26,8 +36,14 @@ describe('groupInflections', () => {
       ['tuve', ['first-person', 'preterite', 'singular']],
       ['tenga', ['first-person', 'present', 'singular', 'subjunctive']],
       ['tenido', ['participle', 'past']],
+      ['tenga', ['formal', 'imperative', 'second-person-semantically', 'singular', 'third-person']],
+      ['ten', ['imperative', 'informal', 'second-person', 'singular']],
     ]);
-    expect(sections.map((s) => s.title)).toEqual(['Present', 'Preterite', 'Present subjunctive', 'Other forms']);
+    expect(sections.map((s) => s.title)).toEqual(['Present', 'Preterite', 'Present subjunctive', 'Imperative', 'Other forms']);
+    expect(sections[3].rows).toEqual([
+      { label: 'usted', forms: ['tenga'] },
+      { label: 'tú', forms: ['ten'] },
+    ]);
     expect(sections[0].rows).toEqual([
       { label: 'yo', forms: ['tengo'] },
       { label: 'tú', forms: ['tienes'] },
@@ -35,7 +51,7 @@ describe('groupInflections', () => {
       { label: 'vos', forms: ['tenés'] },
       { label: 'usted', forms: ['tiene'] },
     ]);
-    expect(sections[3].rows).toEqual([
+    expect(sections[4].rows).toEqual([
       { label: 'Infinitive', forms: ['tener'] },
       { label: 'Past participle', forms: ['tenido'] },
     ]);

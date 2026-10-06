@@ -26,7 +26,19 @@ export function withArticle(lang: LangCode, lemma: string, gender?: string): str
 }
 
 const PRONOUNS: Record<string, Record<string, string>> = {
-  es: { '1s': 'yo', '2s': 'tú', '3s': 'él/ella', '1p': 'nosotros', '2p': 'vosotros', '3p': 'ellos', '2sf': 'usted', '2pf': 'ustedes', '2sv': 'vos' },
+  es: {
+    '1s': 'yo',
+    '2s': 'tú',
+    '3s': 'él/ella',
+    '1p': 'nosotros',
+    '2p': 'vosotros',
+    '3p': 'ellos',
+    '2sf': 'usted',
+    '2pf': 'ustedes',
+    '3sf': 'usted',
+    '3pf': 'ustedes',
+    '2sv': 'vos',
+  },
   fr: { '1s': 'je', '2s': 'tu', '3s': 'il/elle', '1p': 'nous', '2p': 'vous', '3p': 'ils/elles' },
   de: { '1s': 'ich', '2s': 'du', '3s': 'er/sie/es', '1p': 'wir', '2p': 'ihr', '3p': 'sie/Sie' },
   it: { '1s': 'io', '2s': 'tu', '3s': 'lui/lei', '1p': 'noi', '2p': 'voi', '3p': 'loro' },
@@ -37,7 +49,7 @@ const NUMBER: Record<string, string> = { singular: 's', plural: 'p' };
 const MOODS = ['subjunctive', 'subjunctive-i', 'subjunctive-ii', 'imperative', 'conditional'];
 /** Tags that only describe the row (who), not the table (which tense). */
 const ROW_TAGS = new Set([...Object.keys(PERSON), ...Object.keys(NUMBER), 'formal', 'informal', 'vos-form']);
-const NOISE = new Set(['indicative', 'definite', 'indefinite', 'with-ellipsis']);
+const NOISE = new Set(['indicative', 'definite', 'indefinite', 'with-ellipsis', 'second-person-semantically']);
 /** Non-finite form names go last so labels read naturally: "past participle". */
 const NONFINITE = ['infinitive', 'gerund', 'participle', 'supine'];
 const naturalOrder = (tags: string[]) => [
@@ -58,9 +70,15 @@ const readable = (tags: string[]) => tags.map((t) => t.replace(/-/g, ' ')).join(
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function title(tags: string[]): string {
+  // German "subjunctive-i/-ii" already says subjunctive.
+  const specific = tags.some((t) => t.startsWith('subjunctive-'));
   const rest = tags.filter((t) => !MOODS.includes(t) && !NOISE.has(t));
-  const moods = tags.filter((t) => MOODS.includes(t));
-  return capitalize(readable([...rest, ...moods])) || 'Forms';
+  const moods = tags.filter((t) => MOODS.includes(t) && !(specific && t === 'subjunctive'));
+  const words = readable([...rest, ...moods])
+    .split(' ')
+    .filter((w, i, a) => a.indexOf(w) === i) // "imperfect imperfect-se" -> "imperfect se"
+    .map((w) => (w === 'i' || w === 'ii' ? w.toUpperCase() : w));
+  return capitalize(words.join(' ')) || 'Forms';
 }
 
 /**
@@ -81,9 +99,10 @@ export function groupInflections(lang: LangCode, forms: [string, string[]][]): I
     const person = tags.map((t) => PERSON[t]).find(Boolean);
     const number = tags.map((t) => NUMBER[t]).find(Boolean);
     if (person && number) {
-      const key = tags.filter((t) => !ROW_TAGS.has(t)).sort().join(' ');
+      const tableTags = tags.filter((t) => !ROW_TAGS.has(t) && !NOISE.has(t));
+      const key = [...tableTags].sort().join(' ');
       let section = sections.get(key);
-      if (!section) sections.set(key, (section = { title: title(tags.filter((t) => !ROW_TAGS.has(t))), rows: [] }));
+      if (!section) sections.set(key, (section = { title: title(tableTags), rows: [] }));
       const variant = tags.includes('formal') ? 'f' : tags.includes('vos-form') ? 'v' : '';
       const id = `${person}${number}${variant}`;
       const label = PRONOUNS[lang]?.[id] ?? `${readable(tags.filter((t) => t in PERSON || t in NUMBER || t === 'formal'))}`;
