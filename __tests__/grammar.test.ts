@@ -79,11 +79,14 @@ describe('groupInflections', () => {
     ]);
   });
 
-  it('lists noun forms by case and number', () => {
-    const [s] = groupInflections('de', [
+  it('lists noun forms by case, one table per number', () => {
+    const sections = groupInflections('de', [
       ['Hauses', ['genitive', 'singular']],
       ['Häuser', ['nominative', 'plural', 'definite']],
     ]);
-    expect(s.rows.map((r) => r.label)).toEqual(['Genitive singular', 'Nominative plural']);
+    expect(sections.map((s) => `${s.title}: ${s.rows.map((r) => `${r.label}=${r.forms}`)}`)).toEqual([
+      'Singular: Genitive=Hauses',
+      'Plural: Nominative=Häuser',
+    ]);
   });
 });
