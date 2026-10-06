@@ -83,3 +83,51 @@ export function forecast(dues: number[], now: number, count = 14): { key: string
   }
   return keys.map((key) => ({ key, due: counts.get(key)! }));
 }
+
+/** Longest run of consecutive days with reviews. */
+export function bestStreak(days: Record<string, DayActivity> | undefined): number {
+  if (!days) return 0;
+  const active = Object.keys(days)
+    .filter((k) => days[k].reviews > 0)
+    .sort();
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const key of active) {
+    const [y, m, d] = key.split('-').map(Number);
+    run = prev !== null && dayKeyOffset(new Date(y, m - 1, d).getTime(), 1) === prev ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = key;
+  }
+  return best;
+}
+
+export interface CalendarDay {
+  key: string;
+  reviews: number;
+  /** 0 = no reviews, 1–3 = increasing share of the goal, 4 = goal met. */
+  level: 0 | 1 | 2 | 3 | 4;
+  future: boolean;
+}
+
+/** `weeks` columns of Monday→Sunday days ending with the current week, for an activity calendar. */
+export function calendar(days: Record<string, DayActivity> | undefined, now: number, weeks: number, goal: number): CalendarDay[][] {
+  const today = new Date(now);
+  const sinceMonday = (today.getDay() + 6) % 7;
+  const start = -(weeks - 1) * 7 - sinceMonday; // offset (in days, negative = past) of the first Monday
+  return Array.from({ length: weeks }, (_, w) =>
+    Array.from({ length: 7 }, (_, d) => {
+      const offset = start + w * 7 + d;
+      const key = dayKeyOffset(now, -offset);
+      const reviews = days?.[key]?.reviews ?? 0;
+      const share = reviews / Math.max(1, goal);
+      const level = reviews === 0 ? 0 : share >= 1 ? 4 : share >= 0.5 ? 3 : share >= 0.25 ? 2 : 1;
+      return { key, reviews, level, future: offset > 0 };
+    }),
+  );
+}
+
+/** Days in the last `count` (including today) on which the review goal was met. */
+export function goalDays(days: Record<string, DayActivity> | undefined, now: number, goal: number, count = 30): number {
+  return lastDays(days, now, count).filter((d) => d.reviews >= Math.max(1, goal)).length;
+}

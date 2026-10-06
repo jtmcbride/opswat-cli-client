@@ -2,12 +2,22 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 
 import { ColumnChart, type Column } from '@/components/ColumnChart';
-import { Card, Row, Screen, T } from '@/components/ui';
+import { CoverageBar } from '@/components/CoverageBar';
+import { ActivityCalendar, STRENGTH_HELP, StrengthBar } from '@/components/ProgressCharts';
+import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { space, useTheme } from '@/constants/theme';
+import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { useNow } from '@/hooks/useNow';
-import { forecast, lastDays, retentionRate, streak } from '@/lib/activity';
+import { bestStreak, calendar, forecast, goalDays, lastDays, retentionRate, streak } from '@/lib/activity';
+import { corpusCoverage } from '@/lib/coverage';
+import { withArticle } from '@/lib/grammar';
+import { directions } from '@/lib/queue';
 import { isNew } from '@/lib/srs';
+import { strengthCounts } from '@/lib/strength';
 import { languageName, useStore } from '@/store/useStore';
+
+const CALENDAR_WEEKS = 16;
+const pct = (x: number) => `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`;
 
 const label = (key: string, style: 'short' | 'long') => {
   const [y, m, d] = key.split('-').map(Number);
@@ -19,7 +29,7 @@ const label = (key: string, style: 'short' | 'long') => {
 
 function Tile({ title, value, sub }: { title: string; value: string; sub?: string }) {
   return (
-    <Card style={{ flex: 1, minWidth: 140, gap: space.xs }}>
+    <Card style={{ flex: 1, minWidth: 100, gap: space.xs }}>
       <T variant="small">{title}</T>
       <T style={{ fontSize: 24, fontWeight: '600' }}>{value}</T>
       {sub && <T variant="small">{sub}</T>}
@@ -36,6 +46,13 @@ export default function StatsScreen() {
   const days = useStore((s) => s.activity[lang]);
   const allWords = useStore((s) => s.words);
   const words = useMemo(() => allWords.filter((w) => w.lang === lang), [allWords, lang]);
+  const dirs = directions(useStore((s) => s.settings.reviewDirection));
+  const addWord = useStore((s) => s.addWord);
+  const { index, sentences } = useDictionary(lang);
+  const { lemmas } = useKnown(lang, index);
+  const coverage = useMemo(() => (index ? corpusCoverage(sentences, index, lemmas) : null), [sentences, index, lemmas]);
+  const strength = useMemo(() => strengthCounts(words), [words]);
+  const weeks = useMemo(() => calendar(days, now, CALENDAR_WEEKS, goal), [days, now, goal]);
 
   const last14 = useMemo(() => lastDays(days, now, 14), [days, now]);
   const today = last14.at(-1)!;
@@ -70,11 +87,12 @@ export default function StatsScreen() {
       </View>
 
       <Row style={{ flexWrap: 'wrap' }}>
-        <Tile title="Streak" value={`${streak(days, now)} days`} sub="Days in a row with reviews" />
+        <Tile title="Streak" value={`${streak(days, now)} days`} sub={`Best: ${bestStreak(days)} days`} />
+        <Tile title="Goal met" value={`${goalDays(days, now, goal)} / 30`} sub="Days in the last 30" />
         <Tile
           title="Retention"
           value={retention === null ? '—' : `${Math.round(retention * 100)}%`}
-          sub={`Remembered, last 30 days (${reviews30} reviews)`}
+          sub={`Last 30 days (${reviews30} reviews)`}
         />
       </Row>
 
@@ -89,6 +107,52 @@ export default function StatsScreen() {
           <View style={{ width: `${goalShare * 100}%`, height: '100%', backgroundColor: goalShare >= 1 ? t.success : t.primary }} />
         </View>
       </Card>
+
+      <Card>
+        <T variant="heading">Activity</T>
+        <T variant="small">Last {CALENDAR_WEEKS} weeks</T>
+        <ActivityCalendar weeks={weeks} goal={goal} />
+      </Card>
+
+      <Card>
+        <T variant="heading">Vocabulary strength</T>
+        <StrengthBar counts={strength.recognize} label={dirs.includes('produce') ? 'Recognizing (word → meaning)' : 'Words'} />
+        {dirs.includes('produce') && <StrengthBar counts={strength.produce} label="Producing (meaning → word)" />}
+        <T variant="small">{STRENGTH_HELP}</T>
+      </Card>
+
+      {coverage && (
+        <Card>
+          <T variant="heading">Everyday coverage</T>
+          <T variant="small">Share of the words in everyday example sentences that are in your deck</T>
+          <T style={{ fontSize: 28, fontWeight: '600' }}>{pct(coverage.ratio)}</T>
+          <CoverageBar ratio={coverage.ratio} label={false} neutral />
+          {coverage.next.length > 0 && (
+            <>
+              <T variant="small" style={{ marginTop: space.sm }}>
+                Learn next: the most common words you don&apos;t have yet
+              </T>
+              {coverage.next.map(({ lemma, gain }) => {
+                const e = index?.get(lemma);
+                if (!e) return null;
+                return (
+                  <Row key={lemma} style={{ flexWrap: 'nowrap' }}>
+                    <View style={{ flex: 1 }}>
+                      <T style={{ fontWeight: '600' }}>
+                        {withArticle(lang, e.lemma, e.gender)} <T variant="small">+{pct(gain)}</T>
+                      </T>
+                      <T variant="muted" numberOfLines={1}>
+                        {e.gloss}
+                      </T>
+                    </View>
+                    <Button compact variant="secondary" title="Add" onPress={() => addWord(lang, e.lemma, e.gloss)} />
+                  </Row>
+                );
+              })}
+            </>
+          )}
+        </Card>
+      )}
 
       <Card>
         <T variant="heading">Reviews per day</T>

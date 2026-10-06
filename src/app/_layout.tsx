@@ -5,6 +5,7 @@ import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { useTheme } from '@/constants/theme';
 import { startCloudSync } from '@/store/cloud';
+import { startReminderSync } from '@/store/reminders';
 import { useStore } from '@/store/useStore';
 
 const subscribeHydration = (cb: () => void) => useStore.persist.onFinishHydration(cb);
@@ -20,7 +21,9 @@ export default function RootLayout() {
   const hydrated = useHydrated();
   const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
   useEffect(() => {
-    if (hydrated) void startCloudSync();
+    if (!hydrated) return;
+    void startCloudSync();
+    startReminderSync();
   }, [hydrated]);
 
   if (!hydrated) {

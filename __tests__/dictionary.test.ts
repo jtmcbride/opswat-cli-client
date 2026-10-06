@@ -81,3 +81,20 @@ describe('mergeWithStarter', () => {
     expect(idx.get('chat')?.rank).toBe(900);
   });
 });
+
+describe('gender merging', () => {
+  it('keeps a generated gender only when the merged entry is a noun', () => {
+    const idx = new DictIndex([
+      [
+        { lemma: 'no', gloss: 'a no', pos: 'n', gender: 'm' },
+        { lemma: 'casa', gloss: 'house', pos: 'n', gender: 'f' },
+      ],
+      [
+        { lemma: 'no', gloss: 'no; not', pos: 'adv' },
+        { lemma: 'casa', gloss: 'house; home', pos: 'n' },
+      ],
+    ]);
+    expect(idx.get('no')?.gender).toBeUndefined();
+    expect(idx.get('casa')?.gender).toBe('f');
+  });
+});

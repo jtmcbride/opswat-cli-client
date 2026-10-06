@@ -13,9 +13,10 @@ import { DEFAULT_MODEL } from '@/lib/ai';
 import { confirm } from '@/lib/confirm';
 import { pickTextFile, shareText } from '@/lib/files';
 import { recognitionSupported } from '@/lib/recognition';
-import { remindersSupported, scheduleDailyReminder } from '@/lib/reminders';
+import { remindersSupported, scheduleReminders } from '@/lib/reminders';
 import type { ReviewDirection } from '@/lib/types';
 import { syncConfigured } from '@/store/cloud';
+import { reminderPlan } from '@/store/reminders';
 import { languageName, useStore, type Backup } from '@/store/useStore';
 import { useSync } from '@/store/useSync';
 import { loadDictEntries } from '@/store/userDicts';
@@ -41,7 +42,7 @@ export default function SettingsScreen() {
   const [reminderError, setReminderError] = useState<string | null>(null);
   const setReminder = async (time: { hour: number; minute: number } | null) => {
     setReminderError(null);
-    const ok = await scheduleDailyReminder(time);
+    const ok = await scheduleReminders(time ? reminderPlan(time) : null, { ask: true });
     if (ok) setSettings({ reminder: time });
     else setReminderError('Notifications are turned off for this app. Enable them in your device settings.');
   };

@@ -140,8 +140,12 @@ Differences from the plan:
    Voice mode moves to item 6.
 8. ~~**Placement test**~~ — done in v3: band-by-band check with spot checks; known words are
    added in review state with check-ins spread over weeks.
-9. ~~**Habit features**~~ — done in v3: daily goal, streak, Progress screen (retention, reviews
-   per day, upcoming reviews, words added) and daily reminders on iOS/Android.
+9. ~~**Habit features**~~ — done in v3–v4: daily goal, streak, Progress screen (retention, reviews
+   per day, upcoming reviews, words added) and daily reminders on iOS/Android. v4: best streak,
+   goal days, 16-week activity calendar, vocabulary strength tiers by memory stability (per card
+   direction), everyday coverage measured on the built-in sentence corpus with "learn next"
+   suggestions, and reminders scheduled a week ahead that skip a day once its goal is met and
+   name the streak at stake. Still open: weekly summary, milestones, streak freezes.
 10. ~~**Accounts and sync**~~ — done in v4 with Supabase (free tier): email-code sign-in, and
     per-item sync of words, reviews, texts, chats, settings, progress and imported dictionaries.
     Each item merges last-write-wins (same-day activity takes the larger tally); a server write

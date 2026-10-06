@@ -30,8 +30,12 @@ device unless you turn on sync.
   browsers). Long-press for slow speech; optional auto-play on flashcards. Buttons hide when the device
   has no voice for the language. **Say it** buttons check your pronunciation word by word (browsers
   with speech recognition: Chrome, Edge, Safari).
-- **Progress**: streak and daily review goal on the Words tab; a Progress screen with retention,
-  reviews per day, upcoming reviews and words added; optional daily reminder (iOS/Android).
+- **Progress**: streak and daily review goal on the Words tab; a Progress screen with current and
+  best streak, goal days, retention, a 16-week activity calendar, vocabulary strength (new →
+  mastered, per direction), everyday coverage (share of words in everyday sentences you know, plus
+  the most common words to learn next), reviews per day, upcoming reviews and words added. Optional
+  daily reminder (iOS/Android) that skips days you've already met your goal and mentions the
+  streak at stake.
 - **Dictionaries**: built-in Spanish, French, German, Italian, Portuguese and Croatian with 5,000
   words (frequency-ranked, with meanings and inflections) and up to ~12,000 example sentences each
   (Croatian has fewer: Tatoeba has less Croatian), built from
