@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CoverageBar } from '@/components/CoverageBar';
+import { ExplainButton } from '@/components/ExplainButton';
 import { glossFor, Sentence } from '@/components/Sentence';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
@@ -188,6 +189,7 @@ export default function ReaderScreen() {
             ) : null}
           </Row>
           {error && <T style={{ color: t.danger }}>{error}</T>}
+          <ExplainButton key={peek.sentence} sentence={peek.sentence} focus={peek.surface} />
         </Pressable>
       )}
     </View>

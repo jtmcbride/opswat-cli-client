@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ExplainButton } from '@/components/ExplainButton';
 import { glossFor, Sentence } from '@/components/Sentence';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Empty, Row, Screen, T } from '@/components/ui';
@@ -197,6 +198,14 @@ function LearnSession({ lang }: { lang: string }) {
           </T>
         )}
         {done && <T variant="muted">“{exercise.sentence.translation}”</T>}
+        {done && (
+          <ExplainButton
+            key={exercise.sentenceIndex}
+            sentence={exercise.sentence.text}
+            translation={exercise.sentence.translation}
+            focus={target.lemma}
+          />
+        )}
       </Card>
 
       {!done && mode === 'choice' && (

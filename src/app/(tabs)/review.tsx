@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ExplainButton } from '@/components/ExplainButton';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Empty, Input, Row, Screen, T } from '@/components/ui';
 import { radius, space, useTheme } from '@/constants/theme';
@@ -305,6 +306,9 @@ function RecallCard({
           </Row>
           {input.trim() && result !== 'exact' && <T variant="muted">You wrote: {input.trim()}</T>}
           {kind !== 'type' && <T variant="muted">{card.gloss}</T>}
+          {kind === 'cloze' && cloze && result !== 'exact' && (
+            <ExplainButton sentence={cloze.sentence.text} translation={cloze.sentence.translation} focus={cloze.answer} />
+          )}
           <T variant="small">Suggested grade is highlighted — pick another if you disagree.</T>
           <GradeButtons card={card} onGrade={onGrade} suggested={suggested} />
         </Card>

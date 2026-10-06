@@ -230,3 +230,28 @@ export async function glossInContext(opts: {
   });
   return JSON.parse(textOf(res)) as { lemma: string; gloss: string };
 }
+
+/** A brief, learner-friendly grammar explanation of one sentence. */
+export async function explainSentence(opts: {
+  apiKey: string;
+  model: string;
+  language: string;
+  nativeLanguage: string;
+  sentence: string;
+  translation?: string;
+  focus?: string;
+}): Promise<string> {
+  const res = await create(opts.apiKey, {
+    model: opts.model,
+    max_tokens: 1024,
+    output_config: { effort: 'low' },
+    system: `You explain ${opts.language} grammar to a learner whose native language is ${opts.nativeLanguage}. Be brief and concrete: 2-5 short bullet points ("• "), plain text, no headings or markdown emphasis. Cover only what's useful in this sentence: verb forms (tense, person, why), agreement (gender/number), pronouns and word order, idioms. Write in ${opts.nativeLanguage}.`,
+    messages: [
+      {
+        role: 'user',
+        content: `Sentence: ${opts.sentence}${opts.translation ? `\nTranslation: ${opts.translation}` : ''}${opts.focus ? `\nFocus especially on: ${opts.focus}` : ''}`,
+      },
+    ],
+  });
+  return textOf(res);
+}
