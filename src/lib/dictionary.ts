@@ -13,6 +13,8 @@ export class DictIndex {
       for (const raw of source) {
         const lemma = normalize(raw.lemma);
         if (!lemma) continue;
+        // Unranked entries are placed after everything ranked so far.
+        if (raw.rank !== undefined) rank = Math.max(rank, raw.rank);
         const entry: DictEntry = { ...raw, lemma: raw.lemma.trim(), rank: raw.rank ?? ++rank };
         const existing = this.byLemma.get(lemma);
         if (existing) {

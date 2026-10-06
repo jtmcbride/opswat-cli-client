@@ -1,6 +1,6 @@
 import type { DictionaryData } from '@/lib/types';
 
-import { parseGenerated, parseRawDictionary, type GeneratedDictionary, type RawDictionary } from './format';
+import { mergeWithStarter, parseGenerated, parseRawDictionary, type GeneratedDictionary, type RawDictionary } from './format';
 import de from './dictionaries/de';
 import es from './dictionaries/es';
 import fr from './dictionaries/fr';
@@ -52,7 +52,7 @@ export function loadBuiltinDictionary(lang: string): Promise<DictionaryData | un
       const { entries, sentences } = parseGenerated(gen);
       return {
         ...starter,
-        entries: [...entries, ...starter.entries.map(({ rank: _rank, ...e }) => e)],
+        entries: mergeWithStarter(entries, starter.entries),
         sentences: [...starter.sentences, ...sentences],
         sources: gen.sources,
       };

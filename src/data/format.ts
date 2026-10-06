@@ -1,3 +1,4 @@
+import { normalize } from '@/lib/tokenize';
 import type { DictEntry, DictionaryData, SentencePair } from '@/lib/types';
 
 /**
@@ -61,4 +62,20 @@ export function parseGenerated(g: GeneratedDictionary): { entries: DictEntry[]; 
     })),
     sentences: g.sentences.map(([text, translation]) => ({ text, translation })),
   };
+}
+
+/**
+ * Merges generated entries with the curated starter set. Starter glosses win, starter-only words are
+ * appended, and generated headwords that the starter lists as an inflection are dropped, so curated
+ * knowledge decides homographs (French "est" is a form of "être", not "east").
+ */
+export function mergeWithStarter(generated: DictEntry[], starter: DictEntry[]): DictEntry[] {
+  const starterLemmas = new Set(starter.map((e) => normalize(e.lemma)));
+  const starterForms = new Set(
+    starter.flatMap((e) => (e.forms ?? []).map(normalize)).filter((f) => !starterLemmas.has(f)),
+  );
+  return [
+    ...generated.filter((e) => !starterForms.has(normalize(e.lemma))),
+    ...starter.map(({ rank: _rank, ...e }) => e),
+  ];
 }

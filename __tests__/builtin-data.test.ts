@@ -27,6 +27,19 @@ describe.each(BUILTIN_LANGUAGES.map((l) => l.code))('built-in dictionary %s', (c
     }
   });
 
+  it('resolves common inflections through the curated starter forms', async () => {
+    const full = (await loadBuiltinDictionary(code))!;
+    const index = new DictIndex([full.entries]);
+    const checks: Record<string, [string, string][]> = {
+      es: [['la', 'el'], ['es', 'ser']],
+      fr: [['est', 'être'], ['la', 'le']],
+      de: [['ist', 'sein'], ['die', 'der']],
+      it: [['è', 'essere'], ['la', 'il']],
+      pt: [['é', 'ser'], ['a', 'a']],
+    };
+    for (const [form, lemma] of checks[code]) expect(index.lemmaOf(form)).toBe(lemma);
+  });
+
   it('covers every word used in its sentences, including generated data', async () => {
     const full = (await loadBuiltinDictionary(code))!;
     const index = new DictIndex([full.entries]);
