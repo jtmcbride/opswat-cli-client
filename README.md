@@ -8,22 +8,29 @@ device.
 ## Features
 
 - **Words**: add known words with dictionary autocomplete (inflected forms like *tengo* resolve
-  to *tener*), bulk paste, or one-tap “starter” sets of the most common words.
+  to *tener*), bulk paste, one-tap “starter” sets, or a 2-minute **placement test** that marks
+  the common words you already know. Word pages show nouns with their article and full
+  conjugation/declension tables.
 - **Review**: FSRS spaced repetition (the scheduler Anki uses) with adjustable target recall, a
   daily new-word limit, and leech detection (words you keep forgetting can be edited or
   suspended). New words start as flip cards; after that, reviews mix typed recall
-  (meaning → word), fill-in-the-blank sentences, and listening (hear → type), checked accent- and
-  typo-tolerantly with a suggested grade you can override.
+  (meaning → word), fill-in-the-blank sentences, listening (hear → type) and speaking (meaning →
+  say it), checked accent- and typo-tolerantly with a suggested grade you can override.
 - **Learn**: shows a sentence where every word is known except one (“i+1”). Guess from
   multiple choice or tap to reveal, then add the word to your list. Tap any word for its meaning.
 - **Read**: paste or import any text (or have AI write a story at ~95% known words). See what
   share of it you can read, tap any word for its meaning or audio, and add new words from it.
 - **Chat** (optional): an AI conversation partner that writes mostly with your known words and
-  introduces one or two new ones per reply. It can also generate fresh practice sentences.
+  introduces one or two new ones per reply. Free conversation or role-plays (café, directions,
+  hotel…); your mistakes are corrected and can be saved as flashcards. Dictate by voice and have
+  replies read aloud. AI also generates practice sentences and explains grammar on request.
 - **Pronunciation**: speaker buttons on words, flashcards, Learn sentences, and chat replies use the
   device's text-to-speech voices (`expo-speech`; works offline on iOS/Android, Web Speech API in
   browsers). Long-press for slow speech; optional auto-play on flashcards. Buttons hide when the device
-  has no voice for the language.
+  has no voice for the language. **Say it** buttons check your pronunciation word by word (browsers
+  with speech recognition: Chrome, Edge, Safari).
+- **Progress**: streak and daily review goal on the Words tab; a Progress screen with retention,
+  reviews per day, upcoming reviews and words added; optional daily reminder (iOS/Android).
 - **Dictionaries**: built-in Spanish, French, German, Italian, and Portuguese with 5,000 words
   (frequency-ranked, with meanings and inflections) and ~12,000 example sentences each, built from
   open data (see `DATA-LICENSES.md`), plus curated starter sets. Import your own dictionary as CSV,
@@ -57,8 +64,9 @@ Native builds: `npx eas-cli build -p ios|android` (see [EAS docs](https://docs.e
 ## Project layout
 
 ```
-src/app/            screens (expo-router): (tabs)/ Words, Review, Learn, Read, Chat; settings, read/, dictionaries, languages, word/[id]
-src/lib/            pure logic: srs.ts, recall.ts, reading.ts, tokenize.ts, dictionary.ts (DictIndex), picker.ts (i+1), importParser.ts, ai.ts
+src/app/            screens (expo-router): (tabs)/ Words, Review, Learn, Read, Chat; settings, stats, placement, read/, dictionaries, languages, word/[id]
+src/lib/            pure logic: srs.ts (FSRS), queue.ts, recall.ts, reading.ts, grammar.ts, placement.ts, activity.ts,
+                    pronunciation.ts, tokenize.ts, dictionary.ts (DictIndex), picker.ts (i+1), importParser.ts, ai.ts
 src/store/          zustand store persisted to AsyncStorage; imported dictionaries stored per key
 src/data/           curated starter dictionaries (dictionaries/) and generated ones (generated/, lazy-loaded)
 tools/build-data/   pipeline that builds src/data/generated from open data (run by the Build dictionaries workflow)
