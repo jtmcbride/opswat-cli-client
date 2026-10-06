@@ -39,7 +39,7 @@ export default function RootLayout() {
         <Stack.Screen name="read/new" options={{ title: 'New text', presentation: 'modal' }} />
         <Stack.Screen name="read/[id]" options={{ title: 'Read' }} />
         <Stack.Screen name="languages" options={{ title: 'Language', presentation: 'modal' }} />
-        <Stack.Screen name="word/[id]" options={{ title: 'Edit word', presentation: 'modal' }} />
+        <Stack.Screen name="word/[id]" options={{ title: 'Word', presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );
