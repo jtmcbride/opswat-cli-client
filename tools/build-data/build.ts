@@ -26,6 +26,13 @@ const LANGS = {
 type Lang = keyof typeof LANGS;
 
 const WORDS = 5000;
+const SAMPLES: Record<Lang, string[]> = {
+  es: ['tener', 'casa', 'bueno'],
+  fr: ['avoir', 'maison', 'bon'],
+  de: ['haben', 'Haus', 'gut'],
+  it: ['avere', 'casa', 'buono'],
+  pt: ['ter', 'casa', 'bom'],
+};
 const SOURCES = [
   'Word frequencies: FrequencyWords by Hermit Dave (OpenSubtitles 2018), CC BY-SA 4.0',
   'Meanings and inflections: English Wiktionary via kaikki.org (wiktextract), CC BY-SA 4.0',
@@ -61,11 +68,19 @@ async function main() {
     }
     const wiki = new WikiIndex();
     let n = 0;
+    const samples = new Set(SAMPLES[lang]);
     for await (const line of lines(wikiPath)) {
       if (!line) continue;
       try {
-        wiki.add(JSON.parse(line));
+        const entry = JSON.parse(line);
+        wiki.add(entry);
         n++;
+        // Log one raw entry per sample word to document the source format in CI logs.
+        if (samples.has(entry.word) && ['verb', 'noun', 'adj'].includes(entry.pos)) {
+          samples.delete(entry.word);
+          const { word, pos, forms, head_templates, tags, senses } = entry;
+          console.log(`[${lang}] sample ${JSON.stringify({ word, pos, tags, head_templates, senseTags: senses?.slice(0, 3).map((x: { tags?: string[] }) => x.tags), forms: forms?.slice(0, 80) })}`.slice(0, 6000));
+        }
       } catch {
         // Skip malformed lines.
       }
