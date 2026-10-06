@@ -41,6 +41,7 @@
       ]
     ],
     "experiments": {
+      "baseUrl": "/opswat-cli-client",
       "typedRoutes": true,
       "reactCompiler": true
     }
