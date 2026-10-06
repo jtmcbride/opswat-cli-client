@@ -1,0 +1,44 @@
+name: Build dictionaries
+
+# Regenerates src/data/generated/*.json from open data (frequency lists, Wiktionary, Tatoeba)
+# and commits the result back to the branch.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/build-data/**'
+      - '.github/workflows/build-data.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Download open data
+        run: bash tools/build-data/download.sh data-src
+      - name: Build dictionaries
+        run: node --max-old-space-size=6144 node_modules/.bin/tsx tools/build-data/build.ts data-src src/data/generated
+      - name: Check generated data
+        run: npx jest __tests__/builtin-data.test.ts
+      - name: Commit generated data
+        run: |
+          ls -la src/data/generated
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/generated
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Regenerate built-in dictionaries from open data"
+          git push origin HEAD:${{ github.ref_name }}

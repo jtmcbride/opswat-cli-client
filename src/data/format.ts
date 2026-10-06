@@ -38,3 +38,27 @@ export function parseRawDictionary(raw: RawDictionary): DictionaryData {
   });
   return { lang: raw.lang, name: raw.name, entries, sentences };
 }
+
+/**
+ * Dictionaries generated from open data by tools/build-data, stored as tuples to keep them small:
+ * entries are `[lemma, gloss, pos, forms?]` in frequency order, sentences `[text, translation]`.
+ */
+export interface GeneratedDictionary {
+  lang: string;
+  sources: string[];
+  entries: [string, string, string, string[]?][];
+  sentences: [string, string][];
+}
+
+export function parseGenerated(g: GeneratedDictionary): { entries: DictEntry[]; sentences: SentencePair[] } {
+  return {
+    entries: g.entries.map(([lemma, gloss, pos, forms], i) => ({
+      lemma,
+      gloss,
+      rank: i + 1,
+      ...(pos ? { pos } : {}),
+      ...(forms?.length ? { forms } : {}),
+    })),
+    sentences: g.sentences.map(([text, translation]) => ({ text, translation })),
+  };
+}

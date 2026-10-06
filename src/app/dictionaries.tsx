@@ -3,7 +3,8 @@ import { Switch, View } from 'react-native';
 
 import { Button, Card, Input, Row, Screen, T } from '@/components/ui';
 import { space, useTheme } from '@/constants/theme';
-import { builtinDictionary } from '@/data';
+import { useDictionary } from '@/hooks/useDictionary';
+import { BUILTIN_LANGUAGES } from '@/data';
 import { pickTextFile } from '@/lib/files';
 import { parseDictionary, type ParseResult } from '@/lib/importParser';
 import { languageName, useStore } from '@/store/useStore';
@@ -16,7 +17,8 @@ export default function DictionariesScreen() {
   const importDictionary = useStore((s) => s.importDictionary);
   const toggleUserDict = useStore((s) => s.toggleUserDict);
   const removeUserDict = useStore((s) => s.removeUserDict);
-  const builtin = builtinDictionary(lang);
+  const { index, sentences, sources } = useDictionary(lang);
+  const builtin = BUILTIN_LANGUAGES.some((l) => l.code === lang);
   const dicts = allDicts.filter((d) => d.lang === lang);
 
   const [text, setText] = useState('');
@@ -56,9 +58,16 @@ export default function DictionariesScreen() {
       <Card>
         <T variant="heading">Built-in</T>
         {builtin ? (
-          <T variant="muted">
-            {builtin.entries.length} common words · {builtin.sentences.length} example sentences
-          </T>
+          <>
+            <T variant="muted">
+              {index ? `${index.size} words · ${sentences.length} example sentences (incl. imported and AI)` : 'Loading…'}
+            </T>
+            {sources.map((s) => (
+              <T key={s} variant="small">
+                {s}
+              </T>
+            ))}
+          </>
         ) : (
           <T variant="muted">No built-in dictionary for this language. Import one below.</T>
         )}

@@ -22,6 +22,8 @@ export interface DictionaryData {
   name: string;
   entries: DictEntry[];
   sentences: SentencePair[];
+  /** Attribution for generated data. */
+  sources?: string[];
 }
 
 export interface SrsState {

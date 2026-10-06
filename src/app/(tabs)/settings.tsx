@@ -5,7 +5,7 @@ import { Alert, Platform, Switch } from 'react-native';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
 import { useTheme } from '@/constants/theme';
-import { builtinDictionary } from '@/data';
+import { starterDictionary } from '@/data';
 import { useApiKey } from '@/hooks/useApiKey';
 import { useCanSpeak } from '@/hooks/useSpeech';
 import { DEFAULT_MODEL } from '@/lib/ai';
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
   const [model, setModel] = useState(settings.aiModel);
   const [message, setMessage] = useState<string | null>(null);
   const canSpeak = useCanSpeak(settings.activeLang);
-  const sample = builtinDictionary(settings.activeLang)?.sentences[0]?.text ?? languageName(settings.activeLang, custom);
+  const sample = starterDictionary(settings.activeLang)?.sentences[0]?.text ?? languageName(settings.activeLang, custom);
 
   const exportBackup = async () => {
     const s = useStore.getState();

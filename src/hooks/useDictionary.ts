@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { builtinDictionary } from '@/data';
+import { loadBuiltinDictionary } from '@/data';
 import { DictIndex } from '@/lib/dictionary';
 import { knownLemmaSet } from '@/lib/picker';
 import type { LangCode, SentencePair } from '@/lib/types';
 import { useStore } from '@/store/useStore';
 import { loadDictEntries } from '@/store/userDicts';
 
-const indexCache = new Map<string, DictIndex>();
+interface Loaded {
+  index: DictIndex;
+  sentences: SentencePair[];
+  sources: string[];
+}
+
+const cache = new Map<string, Loaded>();
 const EMPTY: SentencePair[] = [];
 
 /** Built-in + enabled user dictionaries for a language, merged into one index. */
@@ -18,15 +24,19 @@ export function useDictionary(lang: LangCode) {
   const key = `${lang}:${enabledIds.join(',')}`;
   // Bumped when an async load finishes so the component re-reads the cache.
   const [, setLoaded] = useState(0);
-  const index = indexCache.get(key) ?? null;
+  const loaded = cache.get(key);
 
   useEffect(() => {
-    if (indexCache.has(key)) return;
+    if (cache.has(key)) return;
     let cancelled = false;
     (async () => {
-      const builtin = builtinDictionary(lang)?.entries ?? [];
+      const builtin = await loadBuiltinDictionary(lang);
       const user = await Promise.all(enabledIds.map(loadDictEntries));
-      indexCache.set(key, new DictIndex([builtin, ...user]));
+      cache.set(key, {
+        index: new DictIndex([builtin?.entries ?? [], ...user]),
+        sentences: builtin?.sentences ?? EMPTY,
+        sources: builtin?.sources ?? [],
+      });
       if (!cancelled) setLoaded((n) => n + 1);
     })();
     return () => {
@@ -35,8 +45,9 @@ export function useDictionary(lang: LangCode) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  const sentences = useMemo(() => [...(builtinDictionary(lang)?.sentences ?? []), ...extra], [lang, extra]);
-  return { index, sentences };
+  const base = loaded?.sentences ?? EMPTY;
+  const sentences = useMemo(() => (extra.length ? [...base, ...extra] : base), [base, extra]);
+  return { index: loaded?.index ?? null, sentences, sources: loaded?.sources ?? [] };
 }
 
 /** Known words for a language plus the derived lemma set used for sentence matching. */
