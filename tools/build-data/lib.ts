@@ -150,21 +150,56 @@ export function stripTones(s: string): string {
 /**
  * Croatian comes from Wiktionary's Serbo-Croatian entries: keep the Latin script, drop tone marks
  * (Croatian text doesn't write them), and drop senses marked Ekavian (Serbian; Croatian is
- * ijekavian). Returns null for entries with nothing left.
+ * ijekavian). Verb tables lose fused future forms ("gledaću" is Serbian; Croatian writes "gledat
+ * ću") and get back the person tags the extraction misses. Returns null for entries with nothing
+ * left.
  */
 export function cleanSerboCroatian(entry: WikiEntry): WikiEntry | null {
   if (CYRILLIC.test(entry.word)) return null;
   const targets = (list?: { word: string }[]) => list?.map((t) => ({ word: stripTones(t.word) }));
   const senses = (entry.senses ?? [])
     .filter((s) => !s.tags?.includes('Ekavian'))
-    .map((s) => ({ ...s, form_of: targets(s.form_of), alt_of: targets(s.alt_of) }));
+    .map((s) => ({
+      ...s,
+      glosses: s.glosses?.map(stripTones),
+      form_of: targets(s.form_of),
+      alt_of: targets(s.alt_of),
+    }));
   if (entry.senses?.length && !senses.length) return null;
-  return {
-    ...entry,
-    word: stripTones(entry.word),
-    senses,
-    forms: entry.forms?.filter((f) => f.form && !CYRILLIC.test(f.form)).map((f) => ({ ...f, form: stripTones(f.form) })),
-  };
+  let forms = entry.forms
+    ?.filter((f) => f.form && !CYRILLIC.test(f.form))
+    .map((f) => ({ ...f, form: stripTones(f.form) }));
+  if (entry.pos === 'verb' && forms) forms = fixVerbPersons(forms.filter((f) => !f.tags?.includes('future-i')));
+  return { ...entry, word: stripTones(entry.word), senses, forms };
+}
+
+type WikiForm = NonNullable<WikiEntry['forms']>[number];
+const PERSONS = ['first-person', 'second-person', 'third-person'];
+
+/**
+ * Serbo-Croatian conjugation tables come through with "third-person" but without first and second
+ * person ("gledam" and "gledaš" are both just "present singular"). Within each tense and number,
+ * the person-less forms are first person then second person, each with the same number of variants;
+ * a lone imperative singular is second person.
+ */
+export function fixVerbPersons(forms: WikiForm[]): WikiForm[] {
+  const groups = new Map<string, WikiForm[]>();
+  for (const f of forms) {
+    const tags = f.tags ?? [];
+    if (!tags.includes('singular') && !tags.includes('plural')) continue;
+    if (tags.some((t) => PERSONS.includes(t))) continue;
+    const key = [...tags].sort().join(' ');
+    groups.set(key, [...(groups.get(key) ?? []), f]);
+  }
+  const persons = new Map<WikiForm, string>();
+  for (const [key, list] of groups) {
+    if (list.length === 1 && key.split(' ').includes('imperative') && key.split(' ').includes('singular')) {
+      persons.set(list[0], 'second-person');
+    } else if (list.length % 2 === 0) {
+      list.forEach((f, i) => persons.set(f, i < list.length / 2 ? 'first-person' : 'second-person'));
+    }
+  }
+  return forms.map((f) => (persons.has(f) ? { ...f, tags: [...(f.tags ?? []), persons.get(f)!] } : f));
 }
 
 /** Gender from the headword line ("casa f (plural casas)", "Haus n (strong, …)") or sense tags. */

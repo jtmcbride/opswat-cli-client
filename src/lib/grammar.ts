@@ -58,6 +58,12 @@ const naturalOrder = (tags: string[]) => [
   ...tags.filter((t) => NONFINITE.includes(t)),
 ];
 
+const CASES = ['nominative', 'genitive', 'dative', 'accusative', 'vocative', 'locative', 'instrumental'];
+const ANIMACY: Record<string, string> = { animate: ' (animate)', inanimate: ' (inanimate)' };
+/** Words in a case table's title, in reading order: "Masculine singular". */
+const CASE_TITLE_ORDER = ['masculine', 'feminine', 'neuter', 'singular', 'plural'];
+const caseTitleRank = (t: string) => (CASE_TITLE_ORDER.includes(t) ? CASE_TITLE_ORDER.indexOf(t) : CASE_TITLE_ORDER.length);
+
 export interface InflectionRow {
   label: string;
   forms: string[];
@@ -108,9 +114,22 @@ export function groupInflections(lang: LangCode, forms: [string, string[]][]): I
       const id = `${person}${number}${variant}`;
       const label = PRONOUNS[lang]?.[id] ?? `${readable(tags.filter((t) => t in PERSON || t in NUMBER || t === 'formal'))}`;
       addRow(section, label, form);
+    } else if (tags.some((t) => CASES.includes(t))) {
+      // Declension: one table per gender/number, one row per case.
+      const kase = tags.find((t) => CASES.includes(t))!;
+      const tableTags = tags
+        .filter((t) => !CASES.includes(t) && !NOISE.has(t) && !(t in ANIMACY) && t !== 'positive')
+        .sort((a, b) => caseTitleRank(a) - caseTitleRank(b));
+      const key = `case:${tableTags.join(' ')}`;
+      let section = sections.get(key);
+      if (!section) sections.set(key, (section = { title: capitalize(readable(tableTags)) || 'Cases', rows: [] }));
+      const animacy = tags.map((t) => ANIMACY[t]).find(Boolean) ?? '';
+      addRow(section, `${capitalize(kase)}${animacy}`, form);
     } else {
       addRow(other, capitalize(readable(naturalOrder(tags.filter((t) => !NOISE.has(t))))) || 'Form', form);
     }
   }
+  const caseRank = (label: string) => CASES.indexOf(label.split(' ')[0].toLowerCase());
+  for (const [key, section] of sections) if (key.startsWith('case:')) section.rows.sort((a, b) => caseRank(a.label) - caseRank(b.label));
   return [...sections.values(), ...(other.rows.length ? [other] : [])];
 }

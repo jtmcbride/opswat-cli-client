@@ -155,5 +155,7 @@ Differences from the plan:
 - **Croatian (v4):** hand-written starter set (~300 words, 80+ sentences, nouns with gender), plus
   generated data from Croatian subtitles, Wiktionary's Serbo-Croatian entries (Latin script,
   ijekavian, tone marks stripped) and Tatoeba. Pronoun rows (ja, ti, on/ona/ono…) in conjugation
-  tables; nouns show gender as "kuća (f.)" since Croatian has no articles. Declension tables use the
-  generic case grouping; a case × number grid would read better (still open).
+  tables (person tags restored, Serbian fused futures dropped); nouns show gender as "kuća (f.)"
+  since Croatian has no articles. Declensions (Croatian and German) show as case tables per gender
+  and number. Still open: Croatian compound tenses (perfect "gledao sam", future "gledat ću") are
+  multi-word and not in the tables.

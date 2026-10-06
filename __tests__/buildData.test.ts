@@ -1,6 +1,7 @@
 import {
   cleanGloss,
   cleanSerboCroatian,
+  fixVerbPersons,
   stripTones,
   genderOf,
   inflectionTable,
@@ -210,5 +211,39 @@ describe('Serbo-Croatian (Croatian) data', () => {
       ],
     })!;
     expect(e.forms?.map((f) => f.form)).toEqual(['kuća', 'kuće']);
+  });
+
+  it('drops Serbian fused futures and restores first/second person in verb tables', () => {
+    const verb = cleanSerboCroatian({
+      word: 'gledati',
+      pos: 'verb',
+      senses: [{ glosses: ['to watch (compare glȅdati)'] }],
+      forms: [
+        { form: 'glȅdām', tags: ['present', 'singular'] },
+        { form: 'gledaš', tags: ['present', 'singular'] },
+        { form: 'gleda', tags: ['present', 'singular', 'third-person'] },
+        { form: 'gledaću', tags: ['future', 'future-i', 'singular'] },
+        { form: 'gledaj', tags: ['imperative', 'singular'] },
+        { form: 'gledajmo', tags: ['imperative', 'plural'] },
+        { form: 'gledajte', tags: ['imperative', 'plural'] },
+      ],
+    })!;
+    expect(verb.senses?.[0].glosses).toEqual(['to watch (compare gledati)']);
+    expect(verb.forms?.map((f) => `${f.form}: ${f.tags?.filter((t) => t.endsWith('-person')).join('')}`)).toEqual([
+      'gledam: first-person',
+      'gledaš: second-person',
+      'gleda: third-person',
+      'gledaj: second-person',
+      'gledajmo: first-person',
+      'gledajte: second-person',
+    ]);
+    // Variants of each person come in equal runs.
+    const imperfect = ['bijah', 'bjeh', 'bijaše', 'bješe'].map((form) => ({ form, tags: ['imperfect', 'singular'] }));
+    expect(fixVerbPersons(imperfect).map((f) => f.tags?.at(-1))).toEqual([
+      'first-person',
+      'first-person',
+      'second-person',
+      'second-person',
+    ]);
   });
 });

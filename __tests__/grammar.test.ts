@@ -26,6 +26,19 @@ describe('groupInflections', () => {
     expect(sections[0].rows.map((r) => r.label)).toEqual(['er/sie/es', 'ich']);
   });
 
+  it('lays out declensions as case tables per gender and number', () => {
+    const sections = groupInflections('hr', [
+      ['kući', ['dative', 'singular']],
+      ['kuća', ['nominative', 'singular']],
+      ['kućama', ['dative', 'plural']],
+      ['dobra', ['genitive', 'masculine', 'positive', 'singular', 'indefinite']],
+      ['dobar', ['accusative', 'inanimate', 'masculine', 'singular']],
+    ]);
+    expect(sections.map((s) => s.title)).toEqual(['Singular', 'Plural', 'Masculine singular']);
+    expect(sections[0].rows.map((r) => `${r.label}=${r.forms}`)).toEqual(['Nominative=kuća', 'Dative=kući']);
+    expect(sections[2].rows.map((r) => r.label)).toEqual(['Genitive', 'Accusative (inanimate)']);
+  });
+
   it('uses Croatian pronouns for person rows', () => {
     const sections = groupInflections('hr', [
       ['gledam', ['present', 'first-person', 'singular']],
