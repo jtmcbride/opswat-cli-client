@@ -233,9 +233,11 @@ function RecallCard({
               </T>
               {cloze.after}
             </T>
-            <T variant="muted" style={{ textAlign: 'center' }}>
-              “{cloze.sentence.translation}”
-            </T>
+            {!!cloze.sentence.translation && (
+              <T variant="muted" style={{ textAlign: 'center' }}>
+                “{cloze.sentence.translation}”
+              </T>
+            )}
             <T variant="small" style={{ textAlign: 'center' }}>
               Hint: {cloze.answer.toLowerCase() === card.word.toLowerCase() ? card.gloss : `${card.word} — ${card.gloss}`}
             </T>

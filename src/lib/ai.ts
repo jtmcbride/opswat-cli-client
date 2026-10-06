@@ -141,3 +141,92 @@ Known words: ${vocabList(opts.knownWords)}`,
       glosses: Object.fromEntries(s.glosses.map((g) => [normalize(g.word), g.gloss])),
     }));
 }
+
+const glossArraySchema = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: { word: { type: 'string' }, gloss: { type: 'string' } },
+    required: ['word', 'gloss'],
+    additionalProperties: false,
+  },
+} as const;
+
+/** A short graded-reader story built almost entirely from known words. */
+export async function generateStory(opts: {
+  apiKey: string;
+  model: string;
+  language: string;
+  nativeLanguage: string;
+  knownWords: string[];
+  topic?: string;
+  length: 'short' | 'medium';
+}): Promise<{ title: string; text: string; glosses: Record<string, string> }> {
+  const words = opts.length === 'short' ? '80-120' : '200-300';
+  const res = await create(opts.apiKey, {
+    model: opts.model,
+    max_tokens: 4096,
+    output_config: {
+      effort: 'low',
+      format: {
+        type: 'json_schema',
+        schema: {
+          type: 'object',
+          properties: { title: { type: 'string' }, text: { type: 'string' }, glosses: glossArraySchema },
+          required: ['title', 'text', 'glosses'],
+          additionalProperties: false,
+        },
+      },
+    },
+    messages: [
+      {
+        role: 'user',
+        content: `Write an engaging ${words}-word story in ${opts.language} for a learner${opts.topic ? ` about: ${opts.topic}` : ''}.
+At least 95% of the running words must come from the learner's known words (any inflection is fine). Use a handful of new, common, useful words that can be guessed from context, and repeat each new word at least twice. Use short paragraphs separated by blank lines. Give a short title in ${opts.language}.
+In "glosses", give the ${opts.nativeLanguage} meaning of every word you used that is not in the known list, exactly as it appears in the text (lowercase).
+
+Known words: ${vocabList(opts.knownWords, 800) || '(none yet: use the most basic, common words only)'}`,
+      },
+    ],
+  });
+  const parsed = JSON.parse(textOf(res)) as { title: string; text: string; glosses: { word: string; gloss: string }[] };
+  return {
+    title: parsed.title,
+    text: parsed.text,
+    glosses: Object.fromEntries(parsed.glosses.map((g) => [normalize(g.word), g.gloss])),
+  };
+}
+
+/** Meaning of a word as used in a specific sentence, for words missing from the dictionary. */
+export async function glossInContext(opts: {
+  apiKey: string;
+  model: string;
+  language: string;
+  nativeLanguage: string;
+  word: string;
+  sentence: string;
+}): Promise<{ lemma: string; gloss: string }> {
+  const res = await create(opts.apiKey, {
+    model: opts.model,
+    max_tokens: 512,
+    output_config: {
+      effort: 'low',
+      format: {
+        type: 'json_schema',
+        schema: {
+          type: 'object',
+          properties: { lemma: { type: 'string' }, gloss: { type: 'string' } },
+          required: ['lemma', 'gloss'],
+          additionalProperties: false,
+        },
+      },
+    },
+    messages: [
+      {
+        role: 'user',
+        content: `In the ${opts.language} sentence "${opts.sentence}", what does "${opts.word}" mean? Reply with its dictionary form (lemma) and a short ${opts.nativeLanguage} gloss (a few words) for this context.`,
+      },
+    ],
+  });
+  return JSON.parse(textOf(res)) as { lemma: string; gloss: string };
+}

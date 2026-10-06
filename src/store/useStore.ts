@@ -12,6 +12,7 @@ import type {
   Grade,
   KnownWord,
   LangCode,
+  ReadingText,
   SentencePair,
   Settings,
   UserDictMeta,
@@ -31,6 +32,7 @@ export interface AppState {
   /** AI-generated practice sentences per language. */
   extraSentences: Record<LangCode, SentencePair[]>;
   chats: Record<LangCode, ChatTurn[]>;
+  texts: ReadingText[];
 
   setSettings: (patch: Partial<Settings>) => void;
   addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
@@ -45,13 +47,16 @@ export interface AppState {
   markSentenceSeen: (lang: LangCode, key: number) => void;
   addExtraSentences: (lang: LangCode, sentences: SentencePair[]) => void;
   setChat: (lang: LangCode, turns: ChatTurn[]) => void;
+  addText: (text: Omit<ReadingText, 'id' | 'createdAt'>) => ReadingText;
+  addTextGlosses: (id: string, glosses: Record<string, string>) => void;
+  removeText: (id: string) => void;
   restore: (backup: Backup) => void;
 }
 
 export type Backup = Pick<
   AppState,
   'settings' | 'customLanguages' | 'words' | 'userDicts' | 'extraSentences' | 'chats'
-> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
+> & Partial<Pick<AppState, 'texts'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -74,6 +79,7 @@ export const useStore = create<AppState>()(
       recentSentences: {},
       extraSentences: {},
       chats: {},
+      texts: [],
 
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
@@ -158,6 +164,19 @@ export const useStore = create<AppState>()(
 
       setChat: (lang, turns) => set((s) => ({ chats: { ...s.chats, [lang]: turns } })),
 
+      addText: (text) => {
+        const t: ReadingText = { ...text, id: uid(), createdAt: Date.now() };
+        set((s) => ({ texts: [t, ...s.texts] }));
+        return t;
+      },
+
+      addTextGlosses: (id, glosses) =>
+        set((s) => ({
+          texts: s.texts.map((t) => (t.id === id ? { ...t, glosses: { ...t.glosses, ...glosses } } : t)),
+        })),
+
+      removeText: (id) => set((s) => ({ texts: s.texts.filter((t) => t.id !== id) })),
+
       restore: (backup) => {
         for (const [id, entries] of Object.entries(backup.dictEntries ?? {})) void saveDictEntries(id, entries);
         set({
@@ -167,6 +186,7 @@ export const useStore = create<AppState>()(
           userDicts: backup.userDicts ?? [],
           extraSentences: backup.extraSentences ?? {},
           chats: backup.chats ?? {},
+          texts: backup.texts ?? [],
           recentSentences: {},
         });
       },
@@ -180,7 +200,7 @@ export const useStore = create<AppState>()(
         const p = (persisted ?? {}) as Partial<AppState>;
         return { ...current, ...p, settings: { ...current.settings, ...p.settings } };
       },
-      partialize: ({ settings, customLanguages, words, userDicts, recentSentences, extraSentences, chats }) => ({
+      partialize: ({ settings, customLanguages, words, userDicts, recentSentences, extraSentences, chats, texts }) => ({
         settings,
         customLanguages,
         words,
@@ -188,6 +208,7 @@ export const useStore = create<AppState>()(
         recentSentences,
         extraSentences,
         chats,
+        texts,
       }),
     },
   ),

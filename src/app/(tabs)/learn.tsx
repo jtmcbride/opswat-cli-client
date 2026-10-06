@@ -149,7 +149,7 @@ function LearnSession({ lang }: { lang: string }) {
           </Card>
         )}
         {!apiKey && (
-          <Button variant="ghost" title="Connect AI in Settings for more sentences" onPress={() => router.navigate('/settings')} />
+          <Button variant="ghost" title="Connect AI in Settings for more sentences" onPress={() => router.push('/settings')} />
         )}
         {error && <T style={{ color: t.danger }}>{error}</T>}
       </Screen>

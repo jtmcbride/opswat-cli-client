@@ -9,19 +9,23 @@ device.
 
 - **Words**: add known words with dictionary autocomplete (inflected forms like *tengo* resolve
   to *tener*), bulk paste, or one-tap “starter” sets of the most common words.
-- **Review**: SM-2 flashcards (Again / Hard / Good / Easy) with word→meaning, meaning→word, or
-  mixed direction.
+- **Review**: SM-2 spaced repetition. New words start as flip cards; after that, reviews mix typed
+  recall (meaning → word), fill-in-the-blank sentences, and listening (hear → type), checked
+  accent- and typo-tolerantly with a suggested grade you can override.
 - **Learn**: shows a sentence where every word is known except one (“i+1”). Guess from
   multiple choice or tap to reveal, then add the word to your list. Tap any word for its meaning.
+- **Read**: paste or import any text (or have AI write a story at ~95% known words). See what
+  share of it you can read, tap any word for its meaning or audio, and add new words from it.
 - **Chat** (optional): an AI conversation partner that writes mostly with your known words and
   introduces one or two new ones per reply. It can also generate fresh practice sentences.
 - **Pronunciation**: speaker buttons on words, flashcards, Learn sentences, and chat replies use the
   device's text-to-speech voices (`expo-speech`; works offline on iOS/Android, Web Speech API in
   browsers). Long-press for slow speech; optional auto-play on flashcards. Buttons hide when the device
   has no voice for the language.
-- **Dictionaries**: built-in Spanish, French, German, Italian, and Portuguese (≈200–250 common
-  words and ≈120 sentences each). Import your own dictionary as CSV, TSV, JSON, or an Anki text
-  export, for any language.
+- **Dictionaries**: built-in Spanish, French, German, Italian, and Portuguese with 5,000 words
+  (frequency-ranked, with meanings and inflections) and ~12,000 example sentences each, built from
+  open data (see `DATA-LICENSES.md`), plus curated starter sets. Import your own dictionary as CSV,
+  TSV, JSON, or an Anki text export, for any language.
 - **Backup**: export/import everything as JSON.
 
 ## Getting started
@@ -51,14 +55,20 @@ Native builds: `npx eas-cli build -p ios|android` (see [EAS docs](https://docs.e
 ## Project layout
 
 ```
-src/app/            screens (expo-router): (tabs)/ Words, Review, Learn, Chat, Settings; dictionaries, languages, word/[id]
-src/lib/            pure logic: srs.ts, tokenize.ts, dictionary.ts (DictIndex), picker.ts (i+1), importParser.ts, ai.ts
+src/app/            screens (expo-router): (tabs)/ Words, Review, Learn, Read, Chat; settings, read/, dictionaries, languages, word/[id]
+src/lib/            pure logic: srs.ts, recall.ts, reading.ts, tokenize.ts, dictionary.ts (DictIndex), picker.ts (i+1), importParser.ts, ai.ts
 src/store/          zustand store persisted to AsyncStorage; imported dictionaries stored per key
-src/data/           built-in dictionaries in a compact text format (see format.ts)
+src/data/           curated starter dictionaries (dictionaries/) and generated ones (generated/, lazy-loaded)
+tools/build-data/   pipeline that builds src/data/generated from open data (run by the Build dictionaries workflow)
 __tests__/          jest tests
 ```
 
-### Adding to a built-in dictionary
+### Regenerating the built-in dictionaries
+
+Run the **Build dictionaries** workflow (Actions tab), or see `DATA-LICENSES.md` to run it locally.
+It also runs automatically when `tools/build-data/` changes.
+
+### Adding to a starter dictionary
 
 Edit `src/data/dictionaries/<lang>.ts`. Entries are `lemma | gloss | pos | form1, form2`, ordered
 by frequency; sentences are `text | translation`. `npm test` fails if a sentence uses a word that

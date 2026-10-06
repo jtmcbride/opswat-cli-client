@@ -24,6 +24,17 @@ function LanguageButton() {
   );
 }
 
+function SettingsButton() {
+  const t = useTheme();
+  return (
+    <Link href="/settings" asChild>
+      <Pressable accessibilityLabel="Settings" style={{ paddingHorizontal: 16 }}>
+        <Ionicons name="settings-outline" size={22} color={t.primary} />
+      </Pressable>
+    </Link>
+  );
+}
+
 const icon = (name: IconName) =>
   function TabIcon({ color, size }: { color: ColorValue; size: number }) {
     return <Ionicons name={name} color={color as string} size={size} />;
@@ -45,6 +56,7 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: t.surface },
         headerTitleStyle: { color: t.text },
         headerRight: () => <LanguageButton />,
+        headerLeft: () => <SettingsButton />,
       }}>
       <Tabs.Screen name="index" options={{ title: 'Words', tabBarIcon: icon('list') }} />
       <Tabs.Screen
@@ -52,8 +64,8 @@ export default function TabLayout() {
         options={{ title: 'Review', tabBarIcon: icon('albums'), tabBarBadge: due > 0 ? due : undefined }}
       />
       <Tabs.Screen name="learn" options={{ title: 'Learn', tabBarIcon: icon('bulb') }} />
+      <Tabs.Screen name="read" options={{ title: 'Read', tabBarIcon: icon('book') }} />
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarIcon: icon('chatbubbles') }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon('settings') }} />
     </Tabs>
   );
 }

@@ -39,7 +39,7 @@ export default function ChatScreen() {
           icon="chatbubbles-outline"
           title="Chat with an AI tutor"
           body="Practice conversation using the words you know. Add your Anthropic API key in Settings to start.">
-          <Button title="Open Settings" onPress={() => router.navigate('/settings')} />
+          <Button title="Open Settings" onPress={() => router.push('/settings')} />
         </Empty>
       </Screen>
     );

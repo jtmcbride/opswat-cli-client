@@ -50,6 +50,17 @@ export interface KnownWord {
 
 export type Grade = 'again' | 'hard' | 'good' | 'easy';
 
+export interface ReadingText {
+  id: string;
+  lang: LangCode;
+  title: string;
+  body: string;
+  source: 'user' | 'ai';
+  createdAt: number;
+  /** Meanings for words the dictionary lacks (from AI generation or lookups), keyed by lowercase word. */
+  glosses?: Record<string, string>;
+}
+
 export interface UserDictMeta {
   id: string;
   lang: LangCode;

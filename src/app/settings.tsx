@@ -58,6 +58,7 @@ export default function SettingsScreen() {
       userDicts: s.userDicts,
       extraSentences: s.extraSentences,
       chats: s.chats,
+      texts: s.texts,
       dictEntries,
     };
     await shareText(`lingo-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup));

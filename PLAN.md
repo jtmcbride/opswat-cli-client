@@ -97,11 +97,41 @@ Differences from the plan:
 - **Storage:** zustand persisted to AsyncStorage (localStorage on web) instead of SQLite. Simpler,
   works identically on web, and is fine at vocabulary scale. Imported dictionaries are stored under
   separate keys. Swap in SQLite if a dictionary gets into the hundreds of thousands of entries.
-- **Built-in content:** the network policy here blocked Tatoeba/Wiktionary downloads, so the
-  built-in dictionaries (≈200–250 words) and sentences (≈120 per language) were written by hand.
-  A test checks that every sentence word resolves to a dictionary entry. Next step: a `tools/`
-  script to build larger dictionaries from openly licensed data.
+- **Built-in content:** hand-written starter dictionaries (≈200–250 curated words, ≈120 sentences
+  per language) are merged with generated ones (5,000 words, 12,000 Tatoeba sentences per language)
+  built by `tools/build-data` in the **Build dictionaries** GitHub Actions workflow. See
+  `DATA-LICENSES.md`.
 - **Flashcards:** one card per word with a direction setting (word→meaning / meaning→word / mixed)
   rather than separate SRS state per direction.
 - **AI:** non-streaming requests with server-side refusal fallback enabled; also used to generate
   new i+1 sentences (with per-word glosses) when the built-in sentences run out.
+
+## 9. v2 (implemented)
+
+1. **Content scale** — open-data pipeline: FrequencyWords ranks, Wiktionary glosses/inflections,
+   Tatoeba sentence pairs filtered to fully-covered sentences and bucketed by their rarest word.
+2. **Recall exercises** — reviews mix typed recall, fill-in-the-blank (from the sentence a word was
+   learned in, or the shortest fully-known corpus sentence) and listening, with accent/typo-tolerant
+   checking and an overridable suggested grade. New cards start as flip cards.
+3. **Reading mode** — paste/import any text or generate an AI story at ~95% known words; shows
+   coverage, tap-to-gloss (AI lookup for words missing from the dictionary), per-paragraph audio,
+   and a list of the text's new words to add.
+
+## 10. Roadmap (not yet built)
+
+4. **Better scheduling** — replace SM-2 with FSRS (fewer reviews for the same retention); daily
+   new-word limit; detect and flag "leeches" (words failed repeatedly); optional separate
+   scheduling per direction/exercise type.
+5. **Grammar awareness** — full conjugation/declension tables (e.g. from Wiktionary inflection
+   data) so all forms of a known lemma are recognised; show gender and conjugation on word pages;
+   an AI "explain this sentence" button.
+6. **Speaking practice** — speech recognition to check pronunciation of words and sentences;
+   shadowing mode (listen, repeat, compare).
+7. **Chat that feeds review** — save the tutor's corrections as review cards; role-play scenarios
+   (café, directions, shopping); hands-free voice mode with TTS + speech recognition.
+8. **Placement test** — adaptive check through frequency bands to bulk-mark known words for
+   non-beginners (replaces the "+25/+100 words" shortcut).
+9. **Habit features** — daily goal, streaks, reminder notifications (expo-notifications), and
+   stats: known-word growth, retention rate, review forecast.
+10. **Accounts and sync** — optional sign-in with cloud sync across devices (currently local-only
+    with JSON backup).
