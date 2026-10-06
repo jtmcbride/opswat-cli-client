@@ -222,7 +222,7 @@ function LearnSession({ lang }: { lang: string }) {
               title="Add to my words"
               icon="add"
               onPress={() => {
-                addWord(lang, target.lemma, target.gloss);
+                addWord(lang, target.lemma, target.gloss, exercise.sentence);
                 next();
               }}
               style={{ flex: 1 }}

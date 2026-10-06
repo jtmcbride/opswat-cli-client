@@ -3,10 +3,21 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { SpeakButton } from '@/components/SpeakButton';
-import { Button, Card, Empty, Row, Screen, T } from '@/components/ui';
+import { Button, Card, Empty, Input, Row, Screen, T } from '@/components/ui';
 import { radius, space, useTheme } from '@/constants/theme';
+import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { useNow } from '@/hooks/useNow';
-import { speak } from '@/lib/speech';
+import { useCanSpeak } from '@/hooks/useSpeech';
+import {
+  checkAnswer,
+  chooseExercise,
+  findContext,
+  SUGGESTED_GRADE,
+  type AnswerResult,
+  type Cloze,
+  type ExerciseKind,
+} from '@/lib/recall';
+import { speak, speechSupported } from '@/lib/speech';
 import { isDue, previewInterval } from '@/lib/srs';
 import type { Grade, KnownWord } from '@/lib/types';
 import { useStore } from '@/store/useStore';
@@ -27,14 +38,15 @@ function formatWhen(ms: number, now: number) {
 }
 
 export default function ReviewScreen() {
-  const t = useTheme();
   const lang = useStore((s) => s.settings.activeLang);
-  const direction = useStore((s) => s.settings.reviewDirection);
+  const settings = useStore((s) => s.settings);
   const allWords = useStore((s) => s.words);
   const gradeWord = useStore((s) => s.gradeWord);
+  const { index, sentences } = useDictionary(lang);
+  const { lemmas } = useKnown(lang, index);
+  const voiceAvailable = useCanSpeak(lang);
   // Re-check periodically so "again" cards (due in ~1 min) come back during a session.
   const now = useNow(15000);
-  const [revealed, setRevealed] = useState(false);
   const [reviewed, setReviewed] = useState(0);
 
   const words = useMemo(() => allWords.filter((w) => w.lang === lang), [allWords, lang]);
@@ -43,22 +55,20 @@ export default function ReviewScreen() {
     [words, now],
   );
   const card: KnownWord | undefined = due[0];
-  // Stable per card so "mixed" mode doesn't flip when re-rendering.
-  const showNativeFirst = useMemo(() => {
-    if (!card) return false;
-    if (direction === 'native') return true;
-    if (direction === 'mixed') return (card.id.charCodeAt(card.id.length - 1) + card.srs.reps) % 2 === 0;
-    return false;
-  }, [card, direction]);
 
-  // Optionally pronounce the word as soon as its side of the card is visible.
-  const autoSpeak = useStore((s) => s.settings.autoSpeak);
-  const speechRate = useStore((s) => s.settings.speechRate);
-  const wordVisible = !!card && (!showNativeFirst || revealed);
-  useEffect(() => {
-    if (autoSpeak && wordVisible && card) void speak(card.word, card.lang, { id: `card:${card.id}`, rate: speechRate });
+  const context = useMemo(
+    () => (card && index && settings.reviewStyle === 'mixed' ? findContext(card, index, sentences, lemmas) : null),
+    // Only recompute when the card changes, not on every known-word change mid-review.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoSpeak, wordVisible, card?.id]);
+    [card?.id, card?.srs.reps, index, sentences, settings.reviewStyle],
+  );
+  const kind: ExerciseKind | null = card
+    ? chooseExercise(card, {
+        style: settings.reviewStyle,
+        hasContext: !!context,
+        canListen: settings.listening && speechSupported && voiceAvailable,
+      })
+    : null;
 
   if (words.length === 0) {
     return (
@@ -70,7 +80,7 @@ export default function ReviewScreen() {
     );
   }
 
-  if (!card) {
+  if (!card || !kind) {
     const next = words.reduce((a, b) => (a.srs.due < b.srs.due ? a : b));
     return (
       <Screen>
@@ -84,18 +94,63 @@ export default function ReviewScreen() {
     );
   }
 
-  const front = showNativeFirst ? card.gloss || '(no meaning)' : card.word;
-  const back = showNativeFirst ? card.word : card.gloss || '(no meaning)';
-
   const grade = (g: Grade) => {
     gradeWord(card.id, g);
-    setRevealed(false);
     setReviewed((n) => n + 1);
   };
 
   return (
     <Screen>
       <T variant="muted">{due.length} due</T>
+      {kind === 'flip' ? (
+        <FlipCard key={`${card.id}:${card.srs.reps}`} card={card} onGrade={grade} />
+      ) : (
+        <RecallCard key={`${card.id}:${card.srs.reps}`} card={card} kind={kind} cloze={context} onGrade={grade} />
+      )}
+    </Screen>
+  );
+}
+
+function GradeButtons({ card, onGrade, suggested }: { card: KnownWord; onGrade: (g: Grade) => void; suggested?: Grade }) {
+  return (
+    <Row style={{ flexWrap: 'nowrap' }}>
+      {GRADES.map(({ grade: g, label }) => (
+        <Button
+          key={g}
+          compact
+          variant={suggested ? (g === suggested ? 'primary' : 'secondary') : g === 'again' ? 'danger' : g === 'good' ? 'primary' : 'secondary'}
+          title={`${label}\n${previewInterval(card.srs, g)}`}
+          onPress={() => onGrade(g)}
+          style={{ flex: 1, minHeight: 56 }}
+        />
+      ))}
+    </Row>
+  );
+}
+
+/** Recognition: see the word (or meaning), reveal, grade yourself. */
+function FlipCard({ card, onGrade }: { card: KnownWord; onGrade: (g: Grade) => void }) {
+  const t = useTheme();
+  const direction = useStore((s) => s.settings.reviewDirection);
+  const autoSpeak = useStore((s) => s.settings.autoSpeak);
+  const speechRate = useStore((s) => s.settings.speechRate);
+  const [revealed, setRevealed] = useState(false);
+  // Stable per card so "mixed" mode doesn't flip when re-rendering.
+  const showNativeFirst =
+    direction === 'native' ||
+    (direction === 'mixed' && (card.id.charCodeAt(card.id.length - 1) + card.srs.reps) % 2 === 0);
+  const wordVisible = !showNativeFirst || revealed;
+
+  useEffect(() => {
+    if (autoSpeak && wordVisible) void speak(card.word, card.lang, { id: `card:${card.id}`, rate: speechRate });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSpeak, wordVisible]);
+
+  const front = showNativeFirst ? card.gloss || '(no meaning)' : card.word;
+  const back = showNativeFirst ? card.word : card.gloss || '(no meaning)';
+
+  return (
+    <>
       <Pressable onPress={() => setRevealed(true)}>
         <Card style={styles.card}>
           <T variant="small">{showNativeFirst ? 'Meaning' : 'Word'}</T>
@@ -117,26 +172,117 @@ export default function ReviewScreen() {
         </Card>
       </Pressable>
       {revealed ? (
-        <Row style={{ flexWrap: 'nowrap' }}>
-          {GRADES.map(({ grade: g, label }) => (
-            <Button
-              key={g}
-              compact
-              variant={g === 'again' ? 'danger' : g === 'good' ? 'primary' : 'secondary'}
-              title={`${label}\n${previewInterval(card.srs, g)}`}
-              onPress={() => grade(g)}
-              style={{ flex: 1, minHeight: 56 }}
-            />
-          ))}
-        </Row>
+        <GradeButtons card={card} onGrade={onGrade} />
       ) : (
         <Button title="Show answer" onPress={() => setRevealed(true)} />
       )}
-    </Screen>
+    </>
+  );
+}
+
+const RESULT_TEXT: Record<AnswerResult, string> = {
+  exact: 'Correct!',
+  accent: 'Correct — watch the accents',
+  typo: 'Almost — small typo',
+  wrong: 'Not quite',
+};
+
+/** Recall: type the word from its meaning, a sentence blank, or its sound. */
+function RecallCard({
+  card,
+  kind,
+  cloze,
+  onGrade,
+}: {
+  card: KnownWord;
+  kind: Exclude<ExerciseKind, 'flip'>;
+  cloze: Cloze | null;
+  onGrade: (g: Grade) => void;
+}) {
+  const t = useTheme();
+  const speechRate = useStore((s) => s.settings.speechRate);
+  const [input, setInput] = useState('');
+  const [result, setResult] = useState<AnswerResult | null>(null);
+  const expected = kind === 'cloze' && cloze ? cloze.answer : card.word;
+
+  useEffect(() => {
+    if (kind === 'listen') void speak(card.word, card.lang, { id: `listen:${card.id}`, rate: speechRate });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const check = (giveUp = false) => setResult(giveUp ? 'wrong' : checkAnswer(input, expected));
+  const suggested = result ? SUGGESTED_GRADE[result] : undefined;
+  const resultColor = result === 'exact' || result === 'accent' ? t.success : result === 'typo' ? t.accent : t.danger;
+
+  return (
+    <>
+      <Card style={styles.card}>
+        {kind === 'type' && (
+          <>
+            <T variant="small">Type the word for</T>
+            <T variant="big">{card.gloss || '(no meaning)'}</T>
+          </>
+        )}
+        {kind === 'cloze' && cloze && (
+          <>
+            <T variant="small">Fill in the blank</T>
+            <T style={{ fontSize: 24, lineHeight: 34, textAlign: 'center' }}>
+              {cloze.before}
+              <T style={{ fontSize: 24, fontWeight: '700', color: result ? resultColor : t.primary }}>
+                {result ? cloze.answer : '_____'}
+              </T>
+              {cloze.after}
+            </T>
+            <T variant="muted" style={{ textAlign: 'center' }}>
+              “{cloze.sentence.translation}”
+            </T>
+            <T variant="small" style={{ textAlign: 'center' }}>
+              Hint: {cloze.answer.toLowerCase() === card.word.toLowerCase() ? card.gloss : `${card.word} — ${card.gloss}`}
+            </T>
+          </>
+        )}
+        {kind === 'listen' && (
+          <>
+            <T variant="small">Type what you hear</T>
+            <SpeakButton text={card.word} lang={card.lang} size={44} id={`listen:${card.id}`} />
+            <T variant="small">Long-press to hear it slowly</T>
+          </>
+        )}
+      </Card>
+
+      {result === null ? (
+        <View style={{ gap: space.sm }}>
+          <Input
+            value={input}
+            onChangeText={setInput}
+            placeholder="Your answer"
+            autoFocus
+            returnKeyType="done"
+            onSubmitEditing={() => input.trim() && check()}
+          />
+          <Row style={{ flexWrap: 'nowrap' }}>
+            <Button title="Check" onPress={() => check()} disabled={!input.trim()} style={{ flex: 1 }} />
+            <Button title="Show me" variant="secondary" onPress={() => check(true)} style={{ flex: 1 }} />
+          </Row>
+        </View>
+      ) : (
+        <Card style={{ borderColor: resultColor, borderWidth: 2 }}>
+          <T style={{ color: resultColor, fontWeight: '700' }}>{RESULT_TEXT[result]}</T>
+          <Row>
+            <T variant="heading">{expected}</T>
+            <SpeakButton text={kind === 'cloze' && cloze ? cloze.sentence.text : card.word} lang={card.lang} />
+          </Row>
+          {input.trim() && result !== 'exact' && <T variant="muted">You wrote: {input.trim()}</T>}
+          {kind !== 'type' && <T variant="muted">{card.gloss}</T>}
+          <T variant="small">Suggested grade is highlighted — pick another if you disagree.</T>
+          <GradeButtons card={card} onGrade={onGrade} suggested={suggested} />
+        </Card>
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { minHeight: 260, justifyContent: 'center', alignItems: 'center', borderRadius: radius.lg, gap: space.lg },
+  card: { minHeight: 240, justifyContent: 'center', alignItems: 'center', borderRadius: radius.lg, gap: space.lg },
   divider: { height: 1, alignSelf: 'stretch' },
 });

@@ -44,6 +44,8 @@ export interface KnownWord {
   gloss: string;
   addedAt: number;
   srs: SrsState;
+  /** The sentence the word was learned from, used for fill-in-the-blank reviews. */
+  context?: SentencePair;
 }
 
 export type Grade = 'again' | 'hard' | 'good' | 'easy';
@@ -72,4 +74,8 @@ export interface Settings {
   speechRate: 'normal' | 'slow';
   /** Speak the word automatically when a flashcard shows it. */
   autoSpeak: boolean;
+  /** "mixed" adds typed recall, fill-in-the-blank and listening exercises to reviews. */
+  reviewStyle: 'flip' | 'mixed';
+  /** Include listening exercises in mixed reviews (needs a voice for the language). */
+  listening: boolean;
 }

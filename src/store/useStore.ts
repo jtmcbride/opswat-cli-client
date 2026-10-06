@@ -33,7 +33,7 @@ export interface AppState {
   chats: Record<LangCode, ChatTurn[]>;
 
   setSettings: (patch: Partial<Settings>) => void;
-  addWord: (lang: LangCode, word: string, gloss: string) => KnownWord | null;
+  addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
   addWords: (lang: LangCode, items: { word: string; gloss: string }[]) => number;
   updateWord: (id: string, patch: Partial<Pick<KnownWord, 'word' | 'gloss'>>) => void;
   removeWord: (id: string) => void;
@@ -65,6 +65,8 @@ export const useStore = create<AppState>()(
         aiModel: DEFAULT_MODEL,
         speechRate: 'normal',
         autoSpeak: false,
+        reviewStyle: 'mixed',
+        listening: true,
       },
       customLanguages: [],
       words: [],
@@ -75,12 +77,20 @@ export const useStore = create<AppState>()(
 
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
-      addWord: (lang, word, gloss) => {
+      addWord: (lang, word, gloss, context) => {
         const w = word.trim();
         if (!w) return null;
         const exists = get().words.some((k) => k.lang === lang && normalize(k.word) === normalize(w));
         if (exists) return null;
-        const kw: KnownWord = { id: uid(), lang, word: w, gloss: gloss.trim(), addedAt: Date.now(), srs: newSrs() };
+        const kw: KnownWord = {
+          id: uid(),
+          lang,
+          word: w,
+          gloss: gloss.trim(),
+          addedAt: Date.now(),
+          srs: newSrs(),
+          ...(context ? { context: { text: context.text, translation: context.translation } } : {}),
+        };
         set((s) => ({ words: [...s.words, kw] }));
         return kw;
       },

@@ -98,6 +98,25 @@ export default function SettingsScreen() {
       <Card>
         <T variant="heading">Flashcards</T>
         <Row>
+          <Chip
+            label="Mixed exercises"
+            selected={settings.reviewStyle === 'mixed'}
+            onPress={() => setSettings({ reviewStyle: 'mixed' })}
+          />
+          <Chip label="Flip cards only" selected={settings.reviewStyle === 'flip'} onPress={() => setSettings({ reviewStyle: 'flip' })} />
+        </Row>
+        <T variant="small">
+          Mixed: new words start as flip cards, then you recall them by typing the word, filling a sentence blank, or
+          writing what you hear.
+        </T>
+        {settings.reviewStyle === 'mixed' && canSpeak && (
+          <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+            <T style={{ flex: 1 }}>Include listening exercises</T>
+            <Switch value={settings.listening} onValueChange={(v) => setSettings({ listening: v })} />
+          </Row>
+        )}
+        <T variant="small">Flip card direction</T>
+        <Row>
           {DIRECTIONS.map((d) => (
             <Chip
               key={d.value}
