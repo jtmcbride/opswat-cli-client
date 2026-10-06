@@ -21,6 +21,9 @@ export class DictIndex {
           // Keep the better (lower) frequency rank, take the newer gloss.
           entry.rank = Math.min(existing.rank ?? Infinity, entry.rank ?? Infinity);
           entry.forms = [...new Set([...(existing.forms ?? []), ...(entry.forms ?? [])])];
+          // Keep grammatical info from earlier sources when a later one (e.g. curated glosses) lacks it.
+          entry.gender ??= existing.gender;
+          entry.pos ??= existing.pos;
           this.entries[this.entries.indexOf(existing)] = entry;
         } else {
           this.entries.push(entry);

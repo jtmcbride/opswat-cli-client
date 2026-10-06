@@ -4,8 +4,25 @@ import { Switch } from 'react-native';
 
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Input, Row, Screen, T } from '@/components/ui';
+import { InflectionTables } from '@/components/InflectionTables';
+import { useDictionary } from '@/hooks/useDictionary';
+import { withArticle } from '@/lib/grammar';
 import { isLeech } from '@/lib/srs';
 import { useStore } from '@/store/useStore';
+
+const POS_NAMES: Record<string, string> = {
+  n: 'noun',
+  v: 'verb',
+  adj: 'adjective',
+  adv: 'adverb',
+  pron: 'pronoun',
+  prep: 'preposition',
+  conj: 'conjunction',
+  det: 'determiner',
+  art: 'article',
+  intj: 'interjection',
+  num: 'number',
+};
 
 function formatDue(ms: number) {
   const days = Math.round((ms - Date.now()) / 86400000);
@@ -20,6 +37,8 @@ export default function EditWordScreen() {
   const removeWord = useStore((s) => s.removeWord);
   const [text, setText] = useState(word?.word ?? '');
   const [gloss, setGloss] = useState(word?.gloss ?? '');
+  const { index } = useDictionary(word?.lang ?? '');
+  const entry = word && index ? index.lookup(word.word) : undefined;
 
   if (!word) {
     return (
@@ -31,6 +50,15 @@ export default function EditWordScreen() {
 
   return (
     <Screen edges={['bottom']}>
+      {entry && (
+        <Card>
+          <T variant="heading">{withArticle(word.lang, entry.lemma, entry.gender)}</T>
+          {entry.pos && <T variant="small">{POS_NAMES[entry.pos] ?? entry.pos}</T>}
+          {['v', 'n', 'adj', 'pron', 'det', 'art'].includes(entry.pos ?? '') && (
+            <InflectionTables lang={word.lang} lemma={entry.lemma} pos={entry.pos} />
+          )}
+        </Card>
+      )}
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
           <T variant="small">Word</T>

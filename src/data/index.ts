@@ -1,6 +1,13 @@
 import type { DictionaryData } from '@/lib/types';
 
-import { mergeWithStarter, parseGenerated, parseRawDictionary, type GeneratedDictionary, type RawDictionary } from './format';
+import {
+  mergeWithStarter,
+  parseGenerated,
+  parseRawDictionary,
+  type GeneratedDictionary,
+  type Inflections,
+  type RawDictionary,
+} from './format';
 import de from './dictionaries/de';
 import es from './dictionaries/es';
 import fr from './dictionaries/fr';
@@ -60,4 +67,36 @@ export function loadBuiltinDictionary(lang: string): Promise<DictionaryData | un
     fullCache.set(lang, p);
   }
   return p;
+}
+
+const INFLECTIONS: Record<string, () => Promise<unknown>> = {
+  es: () => import('./generated/es-forms.json'),
+  fr: () => import('./generated/fr-forms.json'),
+  de: () => import('./generated/de-forms.json'),
+  it: () => import('./generated/it-forms.json'),
+  pt: () => import('./generated/pt-forms.json'),
+};
+const inflectionCache = new Map<string, Promise<Inflections | null>>();
+
+/** Inflection tables for a language, loaded on first use (only word pages need them). */
+export function loadInflections(lang: string): Promise<Inflections | null> {
+  let p = inflectionCache.get(lang);
+  if (!p) {
+    p = (async () => {
+      const mod = (await INFLECTIONS[lang]?.().catch(() => null)) as { default?: Inflections } | Inflections | null;
+      const data = mod && 'default' in mod ? mod.default : (mod as Inflections | null);
+      return data && Object.keys(data.lemmas).length ? data : null;
+    })();
+    inflectionCache.set(lang, p);
+  }
+  return p;
+}
+
+/** One lemma's inflections as [form, tags]. Lookup is case-insensitive ("haus" finds "Haus"). */
+export async function inflectionsFor(lang: string, lemma: string): Promise<[string, string[]][] | null> {
+  const data = await loadInflections(lang);
+  if (!data) return null;
+  const key =
+    lemma in data.lemmas ? lemma : Object.keys(data.lemmas).find((k) => k.toLocaleLowerCase() === lemma.toLocaleLowerCase());
+  return key ? data.lemmas[key].map(([form, i]) => [form, data.tags[i].split(' ')]) : null;
 }

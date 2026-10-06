@@ -12,6 +12,7 @@ import { useApiKey } from '@/hooks/useApiKey';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { glossInContext } from '@/lib/ai';
 import { coverage, splitParagraphs, splitSentences } from '@/lib/reading';
+import { withArticle } from '@/lib/grammar';
 import { normalize } from '@/lib/tokenize';
 import { languageName, useStore } from '@/store/useStore';
 
@@ -52,6 +53,10 @@ export default function ReaderScreen() {
 
   const glosses = text.glosses;
   const displayLemma = (lemma: string) => index?.get(lemma)?.lemma ?? lemma;
+  const withGender = (lemma: string) => {
+    const e = index?.get(lemma);
+    return e ? withArticle(lang, e.lemma, e.gender) : lemma;
+  };
   const glossOf = (lemma: string) => glosses?.[lemma] ?? index?.get(lemma)?.gloss;
 
   const onWord = (surface: string, ls: string[], sentence: string) => {
@@ -140,7 +145,7 @@ export default function ReaderScreen() {
                 <Row key={lemma} style={{ flexWrap: 'nowrap' }}>
                   <View style={{ flex: 1 }}>
                     <T style={{ fontWeight: '600' }}>
-                      {displayLemma(lemma)} <T variant="small">×{count}</T>
+                      {withGender(lemma)} <T variant="small">×{count}</T>
                     </T>
                     <T variant="muted" numberOfLines={1}>
                       {gloss ?? 'Tap the word in the text to look it up'}
@@ -164,7 +169,7 @@ export default function ReaderScreen() {
           <Row style={{ flexWrap: 'nowrap' }}>
             <View style={{ flex: 1 }}>
               <T style={{ fontWeight: '600' }}>
-                {peek.lemma}
+                {index?.get(index.lemmaOf(peek.lemma)) ? withGender(index.lemmaOf(peek.lemma)) : peek.lemma}
                 {normalize(peek.lemma) !== normalize(peek.surface) ? <T variant="small"> ({peek.surface})</T> : null}
               </T>
               <T variant="muted">{peek.gloss ?? 'Not in dictionary'}</T>

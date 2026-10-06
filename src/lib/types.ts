@@ -8,6 +8,8 @@ export interface DictEntry {
   forms?: string[];
   /** 1 = most frequent. Undefined for user entries without a rank. */
   rank?: number;
+  /** Grammatical gender of nouns: "m", "f", "n", or combinations like "fm". */
+  gender?: string;
 }
 
 export interface SentencePair {

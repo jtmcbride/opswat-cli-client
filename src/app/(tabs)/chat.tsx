@@ -10,6 +10,7 @@ import { MAX_WIDTH, radius, space, useTheme } from '@/constants/theme';
 import { useApiKey } from '@/hooks/useApiKey';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { chatReply, type ChatTurn } from '@/lib/ai';
+import { withArticle } from '@/lib/grammar';
 import { languageName, useStore } from '@/store/useStore';
 
 const EMPTY: ChatTurn[] = [];
@@ -145,7 +146,9 @@ export default function ChatScreen() {
             onPress={() => setPeek(null)}
             style={[styles.peek, { backgroundColor: t.surface, borderColor: t.border }]}>
             <View style={{ flex: 1 }}>
-              <T style={{ fontWeight: '600' }}>{peek.lemma}</T>
+              <T style={{ fontWeight: '600' }}>
+                {index?.get(peek.lemma) ? withArticle(lang, peek.lemma, index.get(peek.lemma)?.gender) : peek.lemma}
+              </T>
               <T variant="muted">{peek.gloss ?? 'Not in dictionary'}</T>
             </View>
             <SpeakButton text={peek.word} lang={lang} size={20} />

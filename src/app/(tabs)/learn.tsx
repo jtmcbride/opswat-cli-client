@@ -11,6 +11,7 @@ import { useApiKey } from '@/hooks/useApiKey';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { generateSentences } from '@/lib/ai';
 import { distractors, pickExercise, seededRandom, shuffle, type Exercise } from '@/lib/picker';
+import { withArticle } from '@/lib/grammar';
 import { normalize } from '@/lib/tokenize';
 import type { DictEntry } from '@/lib/types';
 import { languageName, useStore } from '@/store/useStore';
@@ -224,7 +225,7 @@ function LearnSession({ lang }: { lang: string }) {
             <T style={{ color: correct ? t.success : t.danger, fontWeight: '700' }}>{correct ? 'Correct!' : 'Not quite'}</T>
           )}
           <T variant="heading">
-            {target.lemma} — {target.gloss}
+            {withArticle(lang, target.lemma, target.gender)} — {target.gloss}
           </T>
           <Row>
             <Button

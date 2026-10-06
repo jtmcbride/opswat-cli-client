@@ -53,13 +53,17 @@ export interface GeneratedDictionary {
 
 export function parseGenerated(g: GeneratedDictionary): { entries: DictEntry[]; sentences: SentencePair[] } {
   return {
-    entries: g.entries.map(([lemma, gloss, pos, forms], i) => ({
-      lemma,
-      gloss,
-      rank: i + 1,
-      ...(pos ? { pos } : {}),
-      ...(forms?.length ? { forms } : {}),
-    })),
+    entries: g.entries.map(([lemma, gloss, posField, forms], i) => {
+      const [pos, gender] = posField.split(':');
+      return {
+        lemma,
+        gloss,
+        rank: i + 1,
+        ...(pos ? { pos } : {}),
+        ...(gender ? { gender } : {}),
+        ...(forms?.length ? { forms } : {}),
+      };
+    }),
     sentences: g.sentences.map(([text, translation]) => ({ text, translation })),
   };
 }
@@ -78,4 +82,12 @@ export function mergeWithStarter(generated: DictEntry[], starter: DictEntry[]): 
     ...generated.filter((e) => !starterForms.has(normalize(e.lemma))),
     ...starter.map(({ rank: _rank, ...e }) => e),
   ];
+}
+
+/** Inflection tables, lazily loaded per language: `[form, index into tags]` per lemma. */
+export interface Inflections {
+  lang: string;
+  /** Space-separated Wiktionary tag lists, e.g. "first-person indicative present singular". */
+  tags: string[];
+  lemmas: Record<string, [string, number][]>;
 }

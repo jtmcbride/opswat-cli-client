@@ -1,4 +1,16 @@
-import { cleanGloss, parseFrequencyList, pickGlosses, rankLemmas, selectSentences, toGenerated, WikiIndex } from '../tools/build-data/lib';
+import {
+  cleanGloss,
+  genderOf,
+  inflectionTable,
+  parseFrequencyList,
+  pickGlosses,
+  rankLemmas,
+  selectSentences,
+  toGenerated,
+  toInflections,
+  WikiIndex,
+} from '../tools/build-data/lib';
+import { parseGenerated } from '@/data/format';
 import { DictIndex } from '@/lib/dictionary';
 
 function wiki() {
@@ -119,5 +131,58 @@ describe('toGenerated', () => {
     const g = toGenerated('es', [{ lemma: 'a', gloss: 'b', pos: 'n' }, { lemma: 'c', gloss: 'd', forms: ['e'] }], [{ text: 'x', translation: 'y' }], []);
     expect(g.entries).toEqual([['a', 'b', 'n'], ['c', 'd', '', ['e']]]);
     expect(g.sentences).toEqual([['x', 'y']]);
+  });
+});
+
+describe('grammar data', () => {
+  // Shapes taken from real kaikki.org entries.
+  const haus = {
+    word: 'Haus',
+    pos: 'noun',
+    head_templates: [{ expansion: 'Haus n (strong, genitive Hauses, plural Häuser)' }],
+    senses: [{ glosses: ['house'], tags: ['neuter', 'strong'] }],
+    forms: [
+      { form: 'Hauses', tags: ['genitive'] },
+      { form: 'Häuser', tags: ['plural'] },
+      { form: 'Häuschen', tags: ['diminutive', 'neuter'] },
+      { form: 'strong', tags: ['table-tags'] },
+      { form: 'Haus', tags: ['nominative', 'singular'] },
+      { form: 'Häusern', tags: ['dative', 'definite', 'plural'] },
+      { form: 'Häusken', tags: ['Ruhrdeutsch', 'also', 'diminutive', 'neuter'] },
+      { form: 'Hauß', tags: ['alternative', 'obsolete'] },
+    ],
+  };
+
+  it('reads gender from the headword line or sense tags', () => {
+    expect(genderOf(haus)).toBe('n');
+    expect(genderOf({ word: 'casa', pos: 'noun', head_templates: [{ expansion: 'casa f (plural casas)' }] })).toBe('f');
+    expect(genderOf({ word: 'artista', pos: 'noun', head_templates: [{ expansion: 'artista m or f (plural artistas)' }] })).toBe('fm');
+    expect(genderOf({ word: 'x', pos: 'noun', senses: [{ tags: ['masculine'] }] })).toBe('m');
+    expect(genderOf({ word: 'x', pos: 'noun' })).toBeUndefined();
+  });
+
+  it('keeps learner-relevant inflections and drops variants and markers', () => {
+    expect(inflectionTable(haus).map(([f]) => f)).toEqual(['Hauses', 'Häuser', 'Haus', 'Häusern']);
+    const verb = {
+      word: 'tener',
+      pos: 'verb',
+      forms: [
+        { form: 'tengo', tags: ['first-person', 'indicative', 'present', 'singular'] },
+        { form: 'tengo', tags: ['first-person', 'indicative', 'present', 'singular'] },
+        { form: 'haber tenido', tags: ['infinitive', 'perfect'] },
+      ],
+    };
+    expect(inflectionTable(verb)).toEqual([['tengo', ['first-person', 'indicative', 'present', 'singular']]]);
+  });
+
+  it('carries gender through the generated format and interns inflection tags', () => {
+    const w = new WikiIndex();
+    w.add(haus);
+    const entries = rankLemmas([['haus', 10]], w, 10);
+    expect(entries[0]).toMatchObject({ lemma: 'Haus', gender: 'n' });
+    const parsed = parseGenerated(toGenerated('de', entries, [], []));
+    expect(parsed.entries[0]).toMatchObject({ lemma: 'Haus', pos: 'n', gender: 'n' });
+    const infl = toInflections('de', entries, w);
+    expect(infl.lemmas.Haus[0]).toEqual(['Hauses', infl.tags.indexOf('genitive')]);
   });
 });

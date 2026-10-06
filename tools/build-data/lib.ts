@@ -4,7 +4,7 @@
  * - glosses and inflections (English Wiktionary via kaikki.org/wiktextract; CC BY-SA)
  * - sentence pairs (Tatoeba; CC BY 2.0 FR)
  */
-import type { GeneratedDictionary } from '../../src/data/format';
+import type { GeneratedDictionary, Inflections } from '../../src/data/format';
 import { DictIndex } from '../../src/lib/dictionary';
 import type { DictEntry, SentencePair } from '../../src/lib/types';
 
@@ -20,6 +20,7 @@ export interface WikiEntry {
   pos: string;
   senses?: WikiSense[];
   forms?: { form: string; tags?: string[] }[];
+  head_templates?: { expansion?: string }[];
 }
 
 const POS: Record<string, string> = {
@@ -39,6 +40,27 @@ const POS: Record<string, string> = {
 };
 const SKIP_SENSE_TAGS = new Set(['obsolete', 'archaic', 'dated', 'rare', 'historical', 'misspelling', 'nonstandard']);
 const SKIP_FORM_TAGS = new Set(['table-tags', 'inflection-template', 'class', 'romanization', 'error-unrecognized-form']);
+/** Forms with these tags are variants, not part of a learner's inflection table. */
+const SKIP_TABLE_TAGS = new Set([
+  ...SKIP_FORM_TAGS,
+  'alternative',
+  'obsolete',
+  'archaic',
+  'dated',
+  'rare',
+  'nonstandard',
+  'dialectal',
+  'diminutive',
+  'augmentative',
+  'pejorative',
+  'endearing',
+  'multiword-construction',
+  'abbreviation',
+  'misspelling',
+  'pronunciation-spelling',
+]);
+const MAX_TABLE_FORMS = 90;
+const GENDERS: Record<string, string> = { masculine: 'm', feminine: 'f', neuter: 'n' };
 const MAX_GLOSSES = 3;
 const MAX_GLOSS_LEN = 60;
 const MAX_TOTAL_GLOSS = 70;
@@ -55,6 +77,10 @@ interface LemmaRecord {
   pos: string;
   glosses: string[];
   forms: Set<string>;
+  /** Grammatical gender for nouns: m, f, n, or a combination like "mf". */
+  gender?: string;
+  /** Inflection table: [form, tags]. */
+  table: [string, string[]][];
   /** True once a lowercase spelling has been seen ("a" vs "A", "ce" vs "CE"). */
   lowercase: boolean;
 }
@@ -88,14 +114,18 @@ export class WikiIndex {
     if (!glosses.length) return;
 
     const isLower = entry.word === key;
+    const gender = pos === 'n' ? genderOf(entry) : undefined;
+    const table = inflectionTable(entry);
     let rec = this.lemmas.get(key);
     if (!rec) {
-      this.lemmas.set(key, (rec = { display: entry.word, pos, glosses, forms: new Set(), lowercase: isLower }));
+      this.lemmas.set(key, (rec = { display: entry.word, pos, glosses, forms: new Set(), lowercase: isLower, gender, table }));
     } else if (isLower && !rec.lowercase) {
       // Prefer the lowercase word's meaning over an abbreviation or proper noun ("a" over "A").
-      Object.assign(rec, { display: entry.word, pos, glosses: [...glosses, ...rec.glosses], lowercase: true });
+      Object.assign(rec, { display: entry.word, pos, glosses: [...glosses, ...rec.glosses], lowercase: true, gender, table });
     } else {
       rec.glosses.push(...glosses);
+      if (!rec.table.length) rec.table = table;
+      rec.gender ??= gender;
     }
     for (const f of entry.forms ?? []) {
       if (!f.form || /\s/.test(f.form) || f.tags?.some((t) => SKIP_FORM_TAGS.has(t))) continue;
@@ -108,6 +138,34 @@ export class WikiIndex {
       set.add(key);
     }
   }
+}
+
+/** Gender from the headword line ("casa f (plural casas)", "Haus n (strong, …)") or sense tags. */
+export function genderOf(entry: WikiEntry): string | undefined {
+  const head = entry.head_templates?.[0]?.expansion ?? '';
+  const m = /^\S+\s+([mfn])(?:\s+or\s+([mfn]))?(?=[\s,(]|$)/.exec(head);
+  if (m) return [...new Set([m[1], m[2]].filter(Boolean))].sort().join('');
+  const tags = new Set((entry.senses ?? []).flatMap((s) => s.tags ?? []));
+  const g = Object.keys(GENDERS).filter((t) => tags.has(t)).map((t) => GENDERS[t]);
+  return g.length ? g.sort().join('') : undefined;
+}
+
+/** Learner-relevant inflections (conjugations, plurals, cases), without variants and duplicates. */
+export function inflectionTable(entry: WikiEntry): [string, string[]][] {
+  const out: [string, string[]][] = [];
+  const seen = new Set<string>();
+  for (const f of entry.forms ?? []) {
+    const tags = f.tags ?? [];
+    if (!f.form || !tags.length || /\s/.test(f.form) || f.form === '-' || f.form === '—') continue;
+    // Region names (capitalized tags like "Tuscany") mark regional variants.
+    if (tags.some((t) => SKIP_TABLE_TAGS.has(t) || /^[A-Z]/.test(t))) continue;
+    const key = `${f.form}|${tags.join(' ')}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push([f.form, tags]);
+    if (out.length >= MAX_TABLE_FORMS) break;
+  }
+  return out;
 }
 
 export function cleanGloss(raw: string | undefined): string | null {
@@ -195,6 +253,7 @@ export function rankLemmas(freq: [string, number][], wiki: WikiIndex, limit: num
         lemma: rec.display,
         gloss: pickGlosses(rec.glosses),
         pos: rec.pos,
+        ...(rec.gender ? { gender: rec.gender } : {}),
         rank: i + 1,
         ...(forms.length ? { forms } : {}),
       };
@@ -265,7 +324,36 @@ export function toGenerated(lang: string, entries: DictEntry[], sentences: Sente
   return {
     lang,
     sources,
-    entries: entries.map((e) => (e.forms?.length ? [e.lemma, e.gloss, e.pos ?? '', e.forms] : [e.lemma, e.gloss, e.pos ?? ''])),
+    entries: entries.map((e) => {
+      // Gender rides along in the part-of-speech field ("n:f") to keep the tuple format.
+      const pos = e.gender ? `${e.pos ?? ''}:${e.gender}` : (e.pos ?? '');
+      return e.forms?.length ? [e.lemma, e.gloss, pos, e.forms] : [e.lemma, e.gloss, pos];
+    }),
     sentences: sentences.map((s) => [s.text, s.translation]),
   };
+}
+
+/**
+ * Inflection tables for the selected lemmas, with tag lists interned so each form costs only a
+ * string and a number.
+ */
+export function toInflections(lang: string, entries: DictEntry[], wiki: WikiIndex): Inflections {
+  const tagIndex = new Map<string, number>();
+  const tags: string[] = [];
+  const lemmas: Inflections['lemmas'] = {};
+  for (const e of entries) {
+    const rec = wiki.lemmas.get(lower(e.lemma));
+    if (!rec?.table.length) continue;
+    lemmas[e.lemma] = rec.table.map(([form, t]) => {
+      const k = t.join(' ');
+      let i = tagIndex.get(k);
+      if (i === undefined) {
+        i = tags.length;
+        tags.push(k);
+        tagIndex.set(k, i);
+      }
+      return [form, i];
+    });
+  }
+  return { lang, tags, lemmas };
 }

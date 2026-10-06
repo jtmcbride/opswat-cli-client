@@ -14,7 +14,7 @@ import fr from '../../src/data/dictionaries/fr';
 import it from '../../src/data/dictionaries/it';
 import pt from '../../src/data/dictionaries/pt';
 import { DictIndex } from '../../src/lib/dictionary';
-import { parseFrequencyList, rankLemmas, selectSentences, toGenerated, WikiIndex, type Candidate } from './lib';
+import { parseFrequencyList, rankLemmas, selectSentences, toGenerated, toInflections, WikiIndex, type Candidate } from './lib';
 
 const LANGS = {
   es: { iso3: 'spa', starter: es },
@@ -26,13 +26,6 @@ const LANGS = {
 type Lang = keyof typeof LANGS;
 
 const WORDS = 5000;
-const SAMPLES: Record<Lang, string[]> = {
-  es: ['tener', 'casa', 'bueno'],
-  fr: ['avoir', 'maison', 'bon'],
-  de: ['haben', 'Haus', 'gut'],
-  it: ['avere', 'casa', 'buono'],
-  pt: ['ter', 'casa', 'bom'],
-};
 const SOURCES = [
   'Word frequencies: FrequencyWords by Hermit Dave (OpenSubtitles 2018), CC BY-SA 4.0',
   'Meanings and inflections: English Wiktionary via kaikki.org (wiktextract), CC BY-SA 4.0',
@@ -59,6 +52,7 @@ async function main() {
 
   // Dictionaries first: sentence selection needs them.
   const indexes = new Map<Lang, { index: DictIndex; entries: ReturnType<typeof rankLemmas> }>();
+  const inflections = new Map<Lang, ReturnType<typeof toInflections>>();
   for (const lang of langs) {
     const wikiPath = join(src, 'wiktionary', `${lang}.jsonl`);
     const freqPath = join(src, 'freq', `${lang}.txt`);
@@ -68,19 +62,11 @@ async function main() {
     }
     const wiki = new WikiIndex();
     let n = 0;
-    const samples = new Set(SAMPLES[lang]);
     for await (const line of lines(wikiPath)) {
       if (!line) continue;
       try {
-        const entry = JSON.parse(line);
-        wiki.add(entry);
+        wiki.add(JSON.parse(line));
         n++;
-        // Log one raw entry per sample word to document the source format in CI logs.
-        if (samples.has(entry.word) && ['verb', 'noun', 'adj'].includes(entry.pos)) {
-          samples.delete(entry.word);
-          const { word, pos, forms, head_templates, tags, senses } = entry;
-          console.log(`[${lang}] sample ${JSON.stringify({ word, pos, tags, head_templates, senseTags: senses?.slice(0, 3).map((x: { tags?: string[] }) => x.tags), forms: forms?.slice(0, 80) })}`.slice(0, 6000));
-        }
       } catch {
         // Skip malformed lines.
       }
@@ -90,6 +76,7 @@ async function main() {
     const starter = parseRawDictionary(LANGS[lang].starter).entries.map(({ rank: _rank, ...e }) => e);
     const index = new DictIndex([entries, starter]);
     indexes.set(lang, { index, entries });
+    inflections.set(lang, toInflections(lang, entries, wiki));
     console.log(`[${lang}] ${n} wiktionary entries, ${wiki.lemmas.size} lemmas, kept ${entries.length}`);
   }
 
@@ -131,6 +118,9 @@ async function main() {
     const sentences = selectSentences(pool, index);
     const data = toGenerated(lang, entries, sentences, SOURCES);
     writeFileSync(join(out, `${lang}.json`), JSON.stringify(data));
+    const infl = inflections.get(lang)!;
+    writeFileSync(join(out, `${lang}-forms.json`), JSON.stringify(infl));
+    console.log(`[${lang}] inflection tables for ${Object.keys(infl.lemmas).length} words, ${infl.tags.length} tag sets`);
     console.log(`[${lang}] ${pool.length} paired sentences -> ${sentences.length} selected; wrote ${lang}.json`);
   }
 }

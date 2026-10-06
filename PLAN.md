@@ -122,16 +122,16 @@ Differences from the plan:
 4. ~~**Better scheduling**~~ — done in v3: FSRS-5 with adjustable target recall, daily new-word
    limit, leech flagging and suspend. Still open: optimizing FSRS parameters from the learner's own
    review history, and separate scheduling per direction/exercise type.
-5. **Grammar awareness** — full conjugation/declension tables (e.g. from Wiktionary inflection
-   data) so all forms of a known lemma are recognised; show gender and conjugation on word pages;
-   an AI "explain this sentence" button.
+5. ~~**Grammar awareness**~~ — done in v3: noun gender/articles, conjugation and declension tables
+   on word pages (from Wiktionary, lazy-loaded), and an AI "Explain grammar" button. Still open:
+   using the full tables for word recognition (currently only forms seen in the frequency list).
 6. **Speaking practice** — speech recognition to check pronunciation of words and sentences;
    shadowing mode (listen, repeat, compare).
 7. **Chat that feeds review** — save the tutor's corrections as review cards; role-play scenarios
    (café, directions, shopping); hands-free voice mode with TTS + speech recognition.
-8. **Placement test** — adaptive check through frequency bands to bulk-mark known words for
-   non-beginners (replaces the "+25/+100 words" shortcut).
-9. **Habit features** — daily goal, streaks, reminder notifications (expo-notifications), and
-   stats: known-word growth, retention rate, review forecast.
+8. ~~**Placement test**~~ — done in v3: band-by-band check with spot checks; known words are
+   added in review state with check-ins spread over weeks.
+9. ~~**Habit features**~~ — done in v3: daily goal, streak, Progress screen (retention, reviews
+   per day, upcoming reviews, words added) and daily reminders on iOS/Android.
 10. **Accounts and sync** — optional sign-in with cloud sync across devices (currently local-only
     with JSON backup).
