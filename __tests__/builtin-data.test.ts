@@ -1,4 +1,4 @@
-import { BUILTIN_LANGUAGES, loadBuiltinDictionary, starterDictionary } from '@/data';
+import { BUILTIN_LANGUAGES, loadBuiltinDictionary, loadInflections, starterDictionary } from '@/data';
 import { DictIndex } from '@/lib/dictionary';
 import { normalize } from '@/lib/tokenize';
 
@@ -42,7 +42,9 @@ describe.each(BUILTIN_LANGUAGES.map((l) => l.code))('built-in dictionary %s', (c
 
   it('covers every word used in its sentences, including generated data', async () => {
     const full = (await loadBuiltinDictionary(code))!;
-    const index = new DictIndex([full.entries]);
+    const tables = await loadInflections(code);
+    let index = new DictIndex([full.entries]);
+    if (tables) index = index.withTableForms(Object.entries(tables.lemmas).map(([l, fs]) => [l, fs.map(([f]) => f)]));
     const missing = new Set<string>();
     for (const s of full.sentences) {
       for (const lemma of index.sentenceLemmas(s.text)) {
@@ -50,5 +52,23 @@ describe.each(BUILTIN_LANGUAGES.map((l) => l.code))('built-in dictionary %s', (c
       }
     }
     expect([...missing].slice(0, 20)).toEqual([]);
+  });
+
+  it('resolves rarer inflections from the full tables', async () => {
+    const full = (await loadBuiltinDictionary(code))!;
+    const tables = await loadInflections(code);
+    if (!tables) return; // generated data not built
+    const base = new DictIndex([full.entries]);
+    const index = base.withTableForms(Object.entries(tables.lemmas).map(([l, fs]) => [l, fs.map(([f]) => f)]));
+    const checks: Record<string, [string, string][]> = {
+      es: [['tuviéramos', 'tener'], ['hiciesen', 'hacer'], ['es', 'ser']],
+      fr: [['eussions', 'avoir'], ['fîmes', 'faire'], ['est', 'être']],
+      de: [['gingen', 'gehen'], ['hättet', 'haben'], ['ist', 'sein']],
+      it: [['avessimo', 'avere'], ['facessero', 'fare'], ['è', 'essere']],
+      pt: [['tivéramos', 'ter'], ['tiverdes', 'ter'], ['é', 'ser']],
+    };
+    for (const [form, lemma] of checks[code]) expect([form, index.lemmaOf(form)]).toEqual([form, lemma]);
+    // Autocomplete stays limited to dictionary forms.
+    expect(index.search(checks[code][0][0].slice(0, 5)).length).toBe(base.search(checks[code][0][0].slice(0, 5)).length);
   });
 });

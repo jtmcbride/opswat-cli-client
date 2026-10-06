@@ -1,4 +1,5 @@
 import type { DictIndex } from './dictionary';
+import type { ReviewCard } from './queue';
 import { normalize, tokenize } from './tokenize';
 import type { Grade, KnownWord, SentencePair } from './types';
 
@@ -64,20 +65,25 @@ export const SUGGESTED_GRADE: Record<AnswerResult, Grade> = {
 };
 
 /**
- * Picks the exercise for a due card. New cards start with recognition (flip); once seen, recall
- * exercises take over. The choice is deterministic per card and repetition so it doesn't change
- * on re-render.
+ * Picks the exercise for a due card. Recognition cards show the word (or play it); production
+ * cards ask for the word from its meaning, a sentence blank, or by saying it. New and
+ * just-forgotten cards are flip cards first. The choice is deterministic per card and repetition
+ * so it doesn't change on re-render.
  */
 export function chooseExercise(
-  card: KnownWord,
+  card: ReviewCard,
   opts: { style: 'flip' | 'mixed'; hasContext: boolean; canListen: boolean; canSpeak?: boolean },
 ): ExerciseKind {
-  // New and just-forgotten cards are shown as flip cards (recognition) before recall is asked for.
-  if (opts.style === 'flip' || card.srs.state !== 'review' || !card.word.trim()) return 'flip';
-  const kinds: ExerciseKind[] = ['type'];
-  if (opts.hasContext) kinds.push('cloze', 'cloze');
-  if (opts.canListen) kinds.push('listen');
-  if (opts.canSpeak) kinds.push('speak');
+  if (opts.style === 'flip' || card.srs.state !== 'review' || !card.word.word.trim()) return 'flip';
+  const kinds: ExerciseKind[] = [];
+  if (card.dir === 'recognize') {
+    kinds.push('flip', 'flip');
+    if (opts.canListen) kinds.push('listen');
+  } else {
+    kinds.push('type');
+    if (opts.hasContext) kinds.push('cloze', 'cloze');
+    if (opts.canSpeak) kinds.push('speak');
+  }
   let h = card.srs.reps * 31;
   for (const ch of card.id) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
   return kinds[h % kinds.length];

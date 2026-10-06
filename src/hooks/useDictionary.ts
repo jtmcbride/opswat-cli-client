@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { loadBuiltinDictionary } from '@/data';
+import { loadBuiltinDictionary, loadInflections } from '@/data';
 import { DictIndex } from '@/lib/dictionary';
 import { knownLemmaSet } from '@/lib/picker';
 import type { LangCode, SentencePair } from '@/lib/types';
@@ -32,11 +32,18 @@ export function useDictionary(lang: LangCode) {
     (async () => {
       const builtin = await loadBuiltinDictionary(lang);
       const user = await Promise.all(enabledIds.map(loadDictEntries));
-      cache.set(key, {
+      const loaded: Loaded = {
         index: new DictIndex([builtin?.entries ?? [], ...user]),
         sentences: builtin?.sentences ?? EMPTY,
         sources: builtin?.sources ?? [],
-      });
+      };
+      cache.set(key, loaded);
+      if (!cancelled) setLoaded((n) => n + 1);
+      // Then, in the background, every conjugated/declined form from the full tables.
+      const tables = await loadInflections(lang);
+      if (!tables || cache.get(key) !== loaded) return;
+      const forms = Object.entries(tables.lemmas).map(([lemma, list]) => [lemma, list.map(([f]) => f)] as [string, string[]]);
+      cache.set(key, { ...loaded, index: loaded.index.withTableForms(forms) });
       if (!cancelled) setLoaded((n) => n + 1);
     })();
     return () => {

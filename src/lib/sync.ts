@@ -1,5 +1,4 @@
-import type { DayActivity } from './activity';
-import { allItems, applyItems, itemTime, jsonEqual, mergeActivity, splitKey, type Synced } from './syncItems';
+import { allItems, applyItems, itemTime, jsonEqual, mergeItem, splitKey, type Synced } from './syncItems';
 import type { DictEntry, UserDictMeta } from './types';
 
 /** A synced item as stored remotely. `data` is null for deletions. */
@@ -99,16 +98,14 @@ async function applyRows(local: Local, ledger: Ledger, rows: Row[]): Promise<num
     const current = items.get(row.key);
     let value: unknown = row.deleted ? undefined : row.data;
 
-    if (localT !== undefined) {
-      if (kind === 'activity' && current !== undefined && value !== undefined) {
-        // Both devices logged activity that day: combine, and push the combined tally.
-        value = mergeActivity(current as DayActivity, value as DayActivity);
-        ledger.markDirty([row.key], Math.max(localT, row.updated_at));
-      } else if (localT > row.updated_at) {
-        continue; // Our edit is newer; it gets pushed below.
-      } else {
-        ledger.clean(row.key, localT);
-      }
+    const merged = localT !== undefined && current !== undefined && value !== undefined ? mergeItem(row.key, current, value) : undefined;
+    if (merged !== undefined) {
+      // Both devices changed it and both changes count: combine, and push the combination.
+      value = merged;
+      ledger.markDirty([row.key], Math.max(localT!, row.updated_at));
+    } else if (localT !== undefined) {
+      if (localT > row.updated_at) continue; // Our edit is newer; it gets pushed below.
+      ledger.clean(row.key, localT);
     }
 
     if (kind === 'dict') {

@@ -119,12 +119,18 @@ Differences from the plan:
 
 ## 10. Roadmap
 
-4. ~~**Better scheduling**~~ — done in v3: FSRS-5 with adjustable target recall, daily new-word
-   limit, leech flagging and suspend. Still open: optimizing FSRS parameters from the learner's own
-   review history, and separate scheduling per direction/exercise type.
-5. ~~**Grammar awareness**~~ — done in v3: noun gender/articles, conjugation and declension tables
-   on word pages (from Wiktionary, lazy-loaded), and an AI "Explain grammar" button. Still open:
-   using the full tables for word recognition (currently only forms seen in the frequency list).
+4. ~~**Better scheduling**~~ — done in v3–v4: FSRS-5 with adjustable target recall, daily new-card
+   limit, leech flagging and suspend. v4: separate recognition and production cards per word
+   (production joins once the word is learned; siblings never share a day), a synced review log,
+   and on-device fitting of the 19 FSRS parameters to that log (log-loss descent, regularized
+   toward the defaults, kept only if it predicts held-out cards better). Still open: separate
+   schedules per exercise type within a direction, and an "optimal retention" suggestion.
+5. ~~**Grammar awareness**~~ — done in v3–v4: noun gender/articles, conjugation and declension
+   tables on word pages (from Wiktionary, lazy-loaded), and an AI "Explain grammar" button. v4:
+   every form in the full tables is recognized when reading, in chat, in i+1 sentences and in
+   coverage (loaded in the background); curated forms win homographs without dropping the other
+   word ("paso" reads as "pasar", but "pasos" is still "paso"). Built-in sentences now resolve
+   100% of their words, checked in tests against the real generated data.
 6. ~~**Speaking practice**~~ — done in v3 (browsers with speech recognition: Chrome, Edge,
    Safari): "Say it" with per-word feedback, speaking exercises in reviews, chat dictation and
    read-aloud replies. Still open: the same in the native app (needs a speech-recognition module

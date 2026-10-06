@@ -10,7 +10,7 @@ import { MAX_WIDTH, space, useTheme } from '@/constants/theme';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { useNow } from '@/hooks/useNow';
 import { dayKey, streak } from '@/lib/activity';
-import { buildQueue } from '@/lib/queue';
+import { buildQueue, directions } from '@/lib/queue';
 import { isDue, isLeech, isNew } from '@/lib/srs';
 import { normalize } from '@/lib/tokenize';
 import type { DictEntry, KnownWord } from '@/lib/types';
@@ -38,7 +38,8 @@ export default function WordsScreen() {
   );
   const dailyNewLimit = useStore((s) => s.settings.dailyNewLimit);
   const now = useNow();
-  const dueCount = useMemo(() => buildQueue(words, now, dailyNewLimit).cards.length, [words, now, dailyNewLimit]);
+  const dirs = directions(useStore((s) => s.settings.reviewDirection));
+  const dueCount = useMemo(() => buildQueue(words, now, dailyNewLimit, dirs).cards.length, [words, now, dailyNewLimit, dirs]);
   const dailyGoal = useStore((s) => s.settings.dailyGoal);
   const days = useStore((s) => s.activity[lang]);
   const streakDays = streak(days, now);
@@ -231,8 +232,9 @@ export default function WordsScreen() {
 
 function WordRow({ word }: { word: KnownWord }) {
   const t = useTheme();
-  const due = !word.suspended && !isNew(word.srs) && isDue(word.srs);
-  const tag = word.suspended ? 'suspended' : isLeech(word.srs) ? 'leech' : isNew(word.srs) ? 'new' : null;
+  const states = word.produce ? [word.srs, word.produce] : [word.srs];
+  const due = !word.suspended && states.some((s) => !isNew(s) && isDue(s));
+  const tag = word.suspended ? 'suspended' : states.some(isLeech) ? 'leech' : isNew(word.srs) ? 'new' : null;
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/word/[id]', params: { id: word.id } })}

@@ -10,6 +10,11 @@ export interface DictEntry {
   rank?: number;
   /** Grammatical gender of nouns: "m", "f", "n", or combinations like "fm". */
   gender?: string;
+  /**
+   * Curated entry whose forms win over another entry with that headword when reading text
+   * (French "est" reads as a form of "être", not "east").
+   */
+  formsWin?: boolean;
 }
 
 export interface SentencePair {
@@ -52,7 +57,10 @@ export interface KnownWord {
   word: string;
   gloss: string;
   addedAt: number;
+  /** Recognition card: see the word, recall its meaning. */
   srs: SrsState;
+  /** Production card: see the meaning, recall the word. Absent until introduced. */
+  produce?: SrsState;
   /** The sentence the word was learned from, used for fill-in-the-blank reviews. */
   context?: SentencePair;
   /** Excluded from reviews (e.g. a leech the learner set aside). */
@@ -86,7 +94,13 @@ export interface CustomLanguage {
   name: string;
 }
 
+/** Which cards to study: recognition only, production only, or both (each scheduled separately). */
 export type ReviewDirection = 'target' | 'native' | 'mixed';
+
+export type CardDir = 'recognize' | 'produce';
+
+/** One logged review: [time, word key ("lang:word"), 0 = recognize / 1 = produce, grade 1–4, 1 if the card was new]. */
+export type ReviewEntry = [number, string, 0 | 1, number, 0 | 1];
 
 export interface Settings {
   activeLang: LangCode;
@@ -112,4 +126,8 @@ export interface Settings {
   speaking: boolean;
   /** Read the chat tutor's replies aloud automatically. */
   chatAutoSpeak: boolean;
+  /** FSRS parameters fitted to this learner's reviews; null = defaults. */
+  fsrsWeights: number[] | null;
+  /** Reviews the fitted weights were trained on, and how much they improved predictions. */
+  fsrsFit: { reviews: number; improvement: number; at: number } | null;
 }

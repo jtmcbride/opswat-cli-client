@@ -69,18 +69,22 @@ export function parseGenerated(g: GeneratedDictionary): { entries: DictEntry[]; 
 }
 
 /**
- * Merges generated entries with the curated starter set. Starter glosses win, starter-only words are
- * appended, and generated headwords that the starter lists as an inflection are dropped, so curated
- * knowledge decides homographs (French "est" is a form of "être", not "east").
+ * Merges generated entries with the curated starter set. Starter glosses win and starter-only words
+ * are appended. Where a generated headword is also a curated inflection (French "est" east /
+ * "être"; Spanish "paso" step / "pasar"), the curated reading wins in text, and the generated entry
+ * is kept (so its own forms, like "pasos", still resolve) but ranked last, so it isn't offered as a
+ * common word.
  */
 export function mergeWithStarter(generated: DictEntry[], starter: DictEntry[]): DictEntry[] {
   const starterLemmas = new Set(starter.map((e) => normalize(e.lemma)));
   const starterForms = new Set(
     starter.flatMap((e) => (e.forms ?? []).map(normalize)).filter((f) => !starterLemmas.has(f)),
   );
+  const homograph = (e: DictEntry) => starterForms.has(normalize(e.lemma));
   return [
-    ...generated.filter((e) => !starterForms.has(normalize(e.lemma))),
-    ...starter.map(({ rank: _rank, ...e }) => e),
+    ...generated.filter((e) => !homograph(e)),
+    ...starter.map(({ rank: _rank, ...e }) => ({ ...e, formsWin: true })),
+    ...generated.filter(homograph).map(({ rank: _rank, ...e }) => e),
   ];
 }
 

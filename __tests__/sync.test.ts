@@ -38,6 +38,8 @@ const settings: Settings = {
   reminder: null,
   speaking: true,
   chatAutoSpeak: false,
+  fsrsWeights: null,
+  fsrsFit: null,
 };
 
 const empty = (): Synced => ({
@@ -50,6 +52,7 @@ const empty = (): Synced => ({
   chatScenarios: {},
   texts: [],
   activity: {},
+  reviewLog: {},
 });
 
 /** A device: local state with change tracking like the app's store subscriber. */
@@ -191,6 +194,18 @@ describe('syncOnce', () => {
     await a.sync();
     expect(a.state.activity.es.d).toEqual({ reviews: 10, again: 2, added: 3 });
     expect(b.state.activity.es.d).toEqual({ reviews: 10, again: 2, added: 3 });
+  });
+
+  it('keeps every review logged on either device', async () => {
+    const server = new FakeServer();
+    const a = new Device(server);
+    const b = new Device(server);
+    a.edit(() => ({ reviewLog: { d: [[1, 'es:casa', 0, 3, 1]] } }));
+    b.edit(() => ({ reviewLog: { d: [[2, 'es:gato', 1, 1, 0]] } }));
+    await a.sync();
+    await b.sync();
+    await a.sync();
+    for (const d of [a, b]) expect(d.state.reviewLog.d.map((e) => e[1])).toEqual(['es:casa', 'es:gato']);
   });
 
   it('syncs imported dictionaries with their entries', async () => {

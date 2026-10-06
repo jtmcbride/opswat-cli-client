@@ -43,7 +43,16 @@ export default function StatsScreen() {
   const reviews30 = lastDays(days, now, 30).reduce((s, d) => s + d.reviews, 0);
   const retention = retentionRate(days, now);
   const upcoming = useMemo(
-    () => forecast(words.filter((w) => !w.suspended && !isNew(w.srs)).map((w) => w.srs.due), now, 14),
+    () =>
+      forecast(
+        words
+          .filter((w) => !w.suspended)
+          .flatMap((w) => (w.produce ? [w.srs, w.produce] : [w.srs]))
+          .filter((s) => !isNew(s))
+          .map((s) => s.due),
+        now,
+        14,
+      ),
     [words, now],
   );
 

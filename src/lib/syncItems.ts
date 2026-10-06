@@ -3,18 +3,27 @@ import type { AppState } from '@/store/useStore';
 import type { DayActivity } from './activity';
 import type { ChatTurn } from './ai';
 import { migrateSrs } from './srs';
-import { normalize } from './tokenize';
-import type { CustomLanguage, KnownWord, ReadingText, SentencePair, Settings, UserDictMeta } from './types';
+import { wordKey as keyOf } from './tokenize';
+import type { CustomLanguage, KnownWord, ReadingText, ReviewEntry, SentencePair, Settings, UserDictMeta } from './types';
 
 /**
  * The synced parts of the app state, split into items that merge independently across devices:
  * `word:<lang>:<word>`, `text:<id>`, `chat:<lang>`, `settings`, `lang:<code>`, `sentences:<lang>`,
- * `activity:<lang>:<day>` and `dict:<id>`. Words are keyed by spelling, so the same word added on
+ * `activity:<lang>:<day>`, `log:<day>` (review history) and `dict:<id>`. Words are keyed by spelling, so the same word added on
  * two devices becomes one item.
  */
 export type Synced = Pick<
   AppState,
-  'settings' | 'customLanguages' | 'words' | 'userDicts' | 'extraSentences' | 'chats' | 'chatScenarios' | 'texts' | 'activity'
+  | 'settings'
+  | 'customLanguages'
+  | 'words'
+  | 'userDicts'
+  | 'extraSentences'
+  | 'chats'
+  | 'chatScenarios'
+  | 'texts'
+  | 'activity'
+  | 'reviewLog'
 >;
 
 interface Item {
@@ -35,7 +44,7 @@ interface Kind {
 type DeviceSettings = 'reminder';
 const deviceOnly = ({ reminder: _, ...rest }: Settings): Omit<Settings, DeviceSettings> => rest;
 
-const wordKey = (w: KnownWord) => `${w.lang}:${normalize(w.word)}`;
+const wordKey = (w: KnownWord) => keyOf(w.lang, w.word);
 
 function applyList<T>(
   list: T[],
@@ -71,7 +80,7 @@ const KINDS: Record<string, Kind> = {
       // Keep the local id so open screens keep pointing at the word.
       words: applyList(s.words, wordKey, up, del, (v, local) => {
         const w = v as KnownWord;
-        return { ...w, id: local?.id ?? w.id, srs: migrateSrs(w.srs) };
+        return { ...w, id: local?.id ?? w.id, srs: migrateSrs(w.srs), ...(w.produce ? { produce: migrateSrs(w.produce) } : {}) };
       }),
     }),
   },
@@ -143,6 +152,11 @@ const KINDS: Record<string, Kind> = {
       return { activity };
     },
   },
+  log: {
+    slices: ['reviewLog'],
+    items: (s) => Object.entries(s.reviewLog).map(([day, list]) => ({ key: day, value: list, refs: [list] })),
+    apply: (s, up, del) => ({ reviewLog: applyRecord<ReviewEntry[]>(s.reviewLog, up, del) }),
+  },
   dict: {
     slices: ['userDicts'],
     items: (s) => s.userDicts.map((d) => ({ key: d.id, value: d, refs: [d] })),
@@ -208,9 +222,24 @@ export function itemTime(key: string, value: unknown): number {
   return 0;
 }
 
-/** Same-day activity from two devices: keep the larger tally of each count. */
-export function mergeActivity(a: DayActivity, b: DayActivity): DayActivity {
-  return { reviews: Math.max(a.reviews, b.reviews), again: Math.max(a.again, b.again), added: Math.max(a.added, b.added) };
+/**
+ * Combines an item changed on two devices where both changes count: same-day activity keeps the
+ * larger tally of each count, and a day's review history keeps every review. Undefined for items
+ * where the newer version simply wins.
+ */
+export function mergeItem(key: string, local: unknown, remote: unknown): unknown {
+  const [kind] = splitKey(key);
+  if (kind === 'activity') {
+    const a = local as DayActivity;
+    const b = remote as DayActivity;
+    return { reviews: Math.max(a.reviews, b.reviews), again: Math.max(a.again, b.again), added: Math.max(a.added, b.added) };
+  }
+  if (kind === 'log') {
+    const seen = new Set((local as ReviewEntry[]).map((e) => `${e[0]}|${e[1]}|${e[2]}`));
+    const extra = (remote as ReviewEntry[]).filter((e) => !seen.has(`${e[0]}|${e[1]}|${e[2]}`));
+    return [...(local as ReviewEntry[]), ...extra].sort((x, y) => x[0] - y[0]);
+  }
+  return undefined;
 }
 
 /** Structural equality for JSON values (key order ignored, as Postgres `jsonb` reorders keys). */

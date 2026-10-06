@@ -12,20 +12,25 @@ const DAY = 24 * 60 * 60 * 1000;
 const RELEARN_DELAY = 60 * 1000;
 const MAX_INTERVAL_DAYS = 36500;
 
-// FSRS-5 default parameters.
-const W = [
+/** FSRS-5 default parameters, used until fitted to the learner's own reviews (see fsrsFit.ts). */
+export const DEFAULT_WEIGHTS: readonly number[] = [
   0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192, 1.01925, 1.9395, 0.11, 0.29605,
   2.2698, 0.2315, 2.9898, 0.51655, 0.6621,
 ];
+export const DAY_MS = DAY;
 const DECAY = -0.5;
 const FACTOR = 19 / 81; // so that R(t = S) = 0.9
 
-const GRADE_VALUE: Record<Grade, number> = { again: 1, hard: 2, good: 3, easy: 4 };
+export const GRADE_VALUE: Record<Grade, number> = { again: 1, hard: 2, good: 3, easy: 4 };
 
 export interface ScheduleOptions {
   /** Target probability of recall at review time, 0.7–0.97. */
   retention?: number;
+  /** FSRS parameters; defaults to DEFAULT_WEIGHTS. */
+  weights?: readonly number[] | null;
 }
+
+type W = readonly number[];
 
 const clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
 
@@ -40,29 +45,29 @@ export function intervalDays(stability: number, retention = 0.9): number {
   return clamp(Math.round(days), 1, MAX_INTERVAL_DAYS);
 }
 
-const initStability = (g: number) => W[g - 1];
-const initDifficulty = (g: number) => clamp(W[4] - Math.exp(W[5] * (g - 1)) + 1, 1, 10);
+export const initStability = (w: W, g: number) => w[g - 1];
+export const initDifficulty = (w: W, g: number) => clamp(w[4] - Math.exp(w[5] * (g - 1)) + 1, 1, 10);
 
-function nextDifficulty(d: number, g: number): number {
-  const delta = -W[6] * (g - 3);
+export function nextDifficulty(w: W, d: number, g: number): number {
+  const delta = -w[6] * (g - 3);
   const damped = d + (delta * (10 - d)) / 9;
   // Mean reversion toward the difficulty of an "easy" first answer.
-  return clamp(W[7] * initDifficulty(4) + (1 - W[7]) * damped, 1, 10);
+  return clamp(w[7] * initDifficulty(w, 4) + (1 - w[7]) * damped, 1, 10);
 }
 
-function recallStability(d: number, s: number, r: number, g: number): number {
-  const hardPenalty = g === 2 ? W[15] : 1;
-  const easyBonus = g === 4 ? W[16] : 1;
-  return s * (1 + Math.exp(W[8]) * (11 - d) * Math.pow(s, -W[9]) * (Math.exp(W[10] * (1 - r)) - 1) * hardPenalty * easyBonus);
+export function recallStability(w: W, d: number, s: number, r: number, g: number): number {
+  const hardPenalty = g === 2 ? w[15] : 1;
+  const easyBonus = g === 4 ? w[16] : 1;
+  return s * (1 + Math.exp(w[8]) * (11 - d) * Math.pow(s, -w[9]) * (Math.exp(w[10] * (1 - r)) - 1) * hardPenalty * easyBonus);
 }
 
-function lapseStability(d: number, s: number, r: number): number {
-  const next = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp(W[14] * (1 - r));
+export function lapseStability(w: W, d: number, s: number, r: number): number {
+  const next = w[11] * Math.pow(d, -w[12]) * (Math.pow(s + 1, w[13]) - 1) * Math.exp(w[14] * (1 - r));
   return Math.min(next, s);
 }
 
 /** Reviews on the same day (learning steps, retries) use FSRS-5's short-term formula. */
-const shortTermStability = (s: number, g: number) => s * Math.exp(W[17] * (g - 3 + W[18]));
+export const shortTermStability = (w: W, s: number, g: number) => s * Math.exp(w[17] * (g - 3 + w[18]));
 
 export function newSrs(now = Date.now()): SrsState {
   return { state: 'new', stability: 0, difficulty: 0, reps: 0, lapses: 0, due: now };
@@ -79,12 +84,13 @@ export function knownSrs(now: number, dueInDays: number): SrsState {
 /** Pure: the next state for a card given a grade. */
 export function schedule(state: SrsState, grade: Grade, now = Date.now(), opts: ScheduleOptions = {}): SrsState {
   const retention = opts.retention ?? 0.9;
+  const w = opts.weights ?? DEFAULT_WEIGHTS;
   const g = GRADE_VALUE[grade];
   const base = { reps: state.reps + 1, lastReview: now, firstReview: state.firstReview ?? now };
 
   if (state.state === 'new' || !state.stability) {
-    const stability = initStability(g);
-    const difficulty = initDifficulty(g);
+    const stability = initStability(w, g);
+    const difficulty = initDifficulty(w, g);
     if (g === 1) return { ...state, ...base, state: 'learning', stability, difficulty, due: now + RELEARN_DELAY };
     return { ...state, ...base, state: 'review', stability, difficulty, due: now + intervalDays(stability, retention) * DAY };
   }
@@ -92,10 +98,10 @@ export function schedule(state: SrsState, grade: Grade, now = Date.now(), opts: 
   const elapsed = Math.max(0, (now - (state.lastReview ?? now)) / DAY);
   const sameDay = elapsed < 1;
   const r = retrievability(elapsed, state.stability);
-  const difficulty = nextDifficulty(state.difficulty, g);
+  const difficulty = nextDifficulty(w, state.difficulty, g);
 
   if (g === 1) {
-    const stability = sameDay ? shortTermStability(state.stability, g) : lapseStability(state.difficulty, state.stability, r);
+    const stability = sameDay ? shortTermStability(w, state.stability, g) : lapseStability(w, state.difficulty, state.stability, r);
     return {
       ...state,
       ...base,
@@ -109,7 +115,7 @@ export function schedule(state: SrsState, grade: Grade, now = Date.now(), opts: 
 
   // Compute every passing grade so intervals stay ordered: hard <= good < easy.
   const stabilityFor = (gg: number) =>
-    sameDay ? shortTermStability(state.stability, gg) : recallStability(state.difficulty, state.stability, r, gg);
+    sameDay ? shortTermStability(w, state.stability, gg) : recallStability(w, state.difficulty, state.stability, r, gg);
   const hard = intervalDays(stabilityFor(2), retention);
   const good = Math.max(intervalDays(stabilityFor(3), retention), hard);
   const easy = Math.max(intervalDays(stabilityFor(4), retention), good + 1);

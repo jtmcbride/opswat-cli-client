@@ -2,6 +2,7 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Switch } from 'react-native';
 
+import { PersonalScheduling } from '@/components/PersonalScheduling';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
 import { useTheme } from '@/constants/theme';
@@ -20,9 +21,9 @@ import { useSync } from '@/store/useSync';
 import { loadDictEntries } from '@/store/userDicts';
 
 const DIRECTIONS: { value: ReviewDirection; label: string }[] = [
+  { value: 'mixed', label: 'Both' },
   { value: 'target', label: 'Word → meaning' },
   { value: 'native', label: 'Meaning → word' },
-  { value: 'mixed', label: 'Mixed' },
 ];
 
 export default function SettingsScreen() {
@@ -62,6 +63,7 @@ export default function SettingsScreen() {
       chats: s.chats,
       texts: s.texts,
       activity: s.activity,
+      reviewLog: s.reviewLog,
       dictEntries,
     };
     await shareText(`lingo-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup));
@@ -184,7 +186,8 @@ export default function SettingsScreen() {
           Reviews are scheduled (with FSRS) for when you&apos;re this likely to still remember a word. Higher means more
           reviews; 90% is a good balance.
         </T>
-        <T variant="small">Flip card direction</T>
+        <PersonalScheduling />
+        <T variant="small">Cards</T>
         <Row>
           {DIRECTIONS.map((d) => (
             <Chip
@@ -195,6 +198,10 @@ export default function SettingsScreen() {
             />
           ))}
         </Row>
+        <T variant="small">
+          With both, each word gets a recognition card and, once you know it, a production card (meaning → word, typed,
+          spoken or in a sentence). Each is scheduled on its own.
+        </T>
       </Card>
 
       <Card>

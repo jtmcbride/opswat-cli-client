@@ -57,18 +57,26 @@ describe('DictIndex', () => {
 });
 
 describe('mergeWithStarter', () => {
-  it('drops generated headwords the starter lists as inflections and lets starter glosses win', () => {
+  it('lets curated inflections win over generated homographs, and starter glosses win', () => {
     const { mergeWithStarter } = jest.requireActual('@/data/format');
     const merged = mergeWithStarter(
       [
         { lemma: 'est', gloss: 'east', rank: 7 },
         { lemma: 'être', gloss: 'to exist', rank: 2 },
         { lemma: 'chat', gloss: 'cat', rank: 900 },
+        { lemma: 'paso', gloss: 'step', rank: 300, forms: ['pasos'] },
       ],
-      [{ lemma: 'être', gloss: 'to be', rank: 1, forms: ['est', 'suis'] }],
+      [
+        { lemma: 'être', gloss: 'to be', rank: 1, forms: ['est', 'suis'] },
+        { lemma: 'pasar', gloss: 'to pass', rank: 2, forms: ['paso'] },
+      ],
     );
     const idx = new DictIndex([merged]);
     expect(idx.lemmaOf('est')).toBe('être');
+    expect(idx.lemmaOf('paso')).toBe('pasar');
+    // The homograph's own forms still resolve, but it ranks after everything else.
+    expect(idx.lemmaOf('pasos')).toBe('paso');
+    expect(idx.get('est')!.rank).toBeGreaterThan(900);
     expect(idx.get('être')).toMatchObject({ gloss: 'to be', rank: 2 });
     expect(idx.get('chat')?.rank).toBe(900);
   });

@@ -10,12 +10,13 @@ device unless you turn on sync.
 - **Words**: add known words with dictionary autocomplete (inflected forms like *tengo* resolve
   to *tener*), bulk paste, one-tap “starter” sets, or a 2-minute **placement test** that marks
   the common words you already know. Word pages show nouns with their article and full
-  conjugation/declension tables.
+  conjugation/declension tables; every inflected form in those tables is recognized when reading.
 - **Review**: FSRS spaced repetition (the scheduler Anki uses) with adjustable target recall, a
-  daily new-word limit, and leech detection (words you keep forgetting can be edited or
-  suspended). New words start as flip cards; after that, reviews mix typed recall
-  (meaning → word), fill-in-the-blank sentences, listening (hear → type) and speaking (meaning →
-  say it), checked accent- and typo-tolerantly with a suggested grade you can override.
+  daily new-card limit, and leech detection (words you keep forgetting can be edited or
+  suspended). Each word has a recognition card (word → meaning, or hear it) and, once learned, a
+  production card (meaning → word: typed, in a fill-in-the-blank sentence, or spoken), scheduled
+  separately. Answers are checked accent- and typo-tolerantly with a suggested grade you can
+  override. After a few hundred reviews, the scheduler can be tuned to your own memory.
 - **Learn**: shows a sentence where every word is known except one (“i+1”). Guess from
   multiple choice or tap to reveal, then add the word to your list. Tap any word for its meaning.
 - **Read**: paste or import any text (or have AI write a story at ~95% known words). See what

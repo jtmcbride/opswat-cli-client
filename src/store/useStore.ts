@@ -3,17 +3,19 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { BUILTIN_LANGUAGES } from '@/data';
-import { record, type ActivityLog } from '@/lib/activity';
+import { dayKey, record, type ActivityLog } from '@/lib/activity';
 import { DEFAULT_MODEL, type ChatTurn } from '@/lib/ai';
-import { knownSrs, migrateSrs, newSrs, schedule } from '@/lib/srs';
-import { normalize } from '@/lib/tokenize';
+import { GRADE_VALUE, knownSrs, migrateSrs, newSrs, schedule } from '@/lib/srs';
+import { normalize, wordKey } from '@/lib/tokenize';
 import type {
+  CardDir,
   CustomLanguage,
   DictEntry,
   Grade,
   KnownWord,
   LangCode,
   ReadingText,
+  ReviewEntry,
   SentencePair,
   Settings,
   UserDictMeta,
@@ -37,13 +39,15 @@ export interface AppState {
   chatScenarios: Record<LangCode, string | undefined>;
   texts: ReadingText[];
   activity: ActivityLog;
+  /** Every review, by local day, for fitting the scheduler to this learner. */
+  reviewLog: Record<string, ReviewEntry[]>;
 
   setSettings: (patch: Partial<Settings>) => void;
   addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
   addWords: (lang: LangCode, items: { word: string; gloss: string }[], opts?: { known?: boolean }) => number;
   updateWord: (id: string, patch: Partial<Pick<KnownWord, 'word' | 'gloss' | 'suspended'>>) => void;
   removeWord: (id: string) => void;
-  gradeWord: (id: string, grade: Grade) => void;
+  gradeWord: (id: string, grade: Grade, dir?: CardDir) => void;
   addCustomLanguage: (lang: CustomLanguage) => void;
   importDictionary: (lang: LangCode, name: string, entries: DictEntry[]) => Promise<void>;
   toggleUserDict: (id: string) => void;
@@ -60,9 +64,17 @@ export interface AppState {
 export type Backup = Pick<
   AppState,
   'settings' | 'customLanguages' | 'words' | 'userDicts' | 'extraSentences' | 'chats'
-> & Partial<Pick<AppState, 'texts' | 'activity'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
+> & Partial<Pick<AppState, 'texts' | 'activity' | 'reviewLog'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
 
-const migrateWords = (words: KnownWord[]) => words.map((w) => ({ ...w, srs: migrateSrs(w.srs) }));
+const migrateWords = (words: KnownWord[]) =>
+  words.map((w) => ({ ...w, srs: migrateSrs(w.srs), ...(w.produce ? { produce: migrateSrs(w.produce) } : {}) }));
+
+/**
+ * v2 -> v3: words get separate production cards. Reviews used to mix recognition and recall
+ * exercises on one schedule, so words already in review carry that schedule over to both cards.
+ */
+const splitDirections = (words: KnownWord[]) =>
+  words.map((w) => (w.srs.state === 'review' && w.srs.reps >= 2 && !w.produce ? { ...w, produce: { ...w.srs } } : w));
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -72,7 +84,7 @@ export const useStore = create<AppState>()(
       settings: {
         activeLang: 'es',
         nativeLang: 'English',
-        reviewDirection: 'target',
+        reviewDirection: 'mixed',
         aiModel: DEFAULT_MODEL,
         speechRate: 'normal',
         autoSpeak: false,
@@ -84,6 +96,8 @@ export const useStore = create<AppState>()(
         reminder: null,
         speaking: true,
         chatAutoSpeak: false,
+        fsrsWeights: null,
+        fsrsFit: null,
       },
       customLanguages: [],
       words: [],
@@ -94,6 +108,7 @@ export const useStore = create<AppState>()(
       chatScenarios: {},
       texts: [],
       activity: {},
+      reviewLog: {},
 
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
@@ -142,16 +157,21 @@ export const useStore = create<AppState>()(
 
       removeWord: (id) => set((s) => ({ words: s.words.filter((w) => w.id !== id) })),
 
-      gradeWord: (id, grade) =>
-        set((s) => ({
-          activity: record(s.activity, s.words.find((w) => w.id === id)?.lang ?? s.settings.activeLang, Date.now(), {
-            reviews: 1,
-            again: grade === 'again' ? 1 : 0,
-          }),
-          words: s.words.map((w) =>
-            w.id === id ? { ...w, srs: schedule(w.srs, grade, Date.now(), { retention: s.settings.retention }) } : w,
-          ),
-        })),
+      gradeWord: (id, grade, dir = 'recognize') =>
+        set((s) => {
+          const w = s.words.find((x) => x.id === id);
+          if (!w) return s;
+          const now = Date.now();
+          const before = dir === 'produce' ? (w.produce ?? newSrs(w.addedAt)) : w.srs;
+          const after = schedule(before, grade, now, { retention: s.settings.retention, weights: s.settings.fsrsWeights });
+          const entry: ReviewEntry = [now, wordKey(w.lang, w.word), dir === 'produce' ? 1 : 0, GRADE_VALUE[grade], before.state === 'new' ? 1 : 0];
+          const day = dayKey(now);
+          return {
+            activity: record(s.activity, w.lang, now, { reviews: 1, again: grade === 'again' ? 1 : 0 }),
+            words: s.words.map((x) => (x.id === id ? { ...x, ...(dir === 'produce' ? { produce: after } : { srs: after }) } : x)),
+            reviewLog: { ...s.reviewLog, [day]: [...(s.reviewLog[day] ?? []), entry] },
+          };
+        }),
 
       addCustomLanguage: (lang) =>
         set((s) =>
@@ -221,17 +241,23 @@ export const useStore = create<AppState>()(
           chats: backup.chats ?? {},
           texts: backup.texts ?? [],
           activity: backup.activity ?? {},
+          reviewLog: backup.reviewLog ?? {},
           recentSentences: {},
         });
       },
     }),
     {
       name: 'lingo.state',
-      version: 2,
-      // v1 -> v2: SM-2 scheduling state becomes FSRS state.
+      version: 3,
       migrate: (persisted, version) => {
         const p = (persisted ?? {}) as Partial<AppState>;
+        // v1 -> v2: SM-2 scheduling state becomes FSRS state.
         if (version < 2 && p.words) p.words = migrateWords(p.words);
+        if (version < 3) {
+          if (p.words && p.settings?.reviewStyle !== 'flip') p.words = splitDirections(p.words);
+          // "Word → meaning" used to still mix in recall exercises; that's now the production card.
+          if (p.settings && p.settings.reviewDirection !== 'native') p.settings = { ...p.settings, reviewDirection: 'mixed' };
+        }
         return p as AppState;
       },
       storage: createJSONStorage(() => AsyncStorage),
@@ -251,6 +277,7 @@ export const useStore = create<AppState>()(
         chatScenarios,
         texts,
         activity,
+        reviewLog,
       }) => ({
         settings,
         customLanguages,
@@ -262,6 +289,7 @@ export const useStore = create<AppState>()(
         chatScenarios,
         texts,
         activity,
+        reviewLog,
       }),
     },
   ),
