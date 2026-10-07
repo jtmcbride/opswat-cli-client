@@ -1,8 +1,8 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 
 import { Button, Card, Chip, Empty, Row, Screen, T } from '@/components/ui';
+import { goBack } from '@/lib/nav';
 import { space, useTheme } from '@/constants/theme';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { distractors, seededRandom, shuffle } from '@/lib/picker';
@@ -120,7 +120,7 @@ export default function PlacementScreen() {
         ) : (
           <T style={{ color: t.success }}>Added {added} words.</T>
         )}
-        <Button variant="secondary" title="Done" onPress={() => router.back()} />
+        <Button variant="secondary" title="Done" onPress={() => goBack()} />
       </Screen>
     );
   }

@@ -1,7 +1,8 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { DarkTheme, DefaultTheme, Link, Stack, ThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useSyncExternalStore } from 'react';
-import { ActivityIndicator, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Pressable, useColorScheme, View } from 'react-native';
 
 import { useTheme } from '@/constants/theme';
 import { startCloudSync } from '@/store/cloud';
@@ -13,6 +14,18 @@ const isHydrated = () => useStore.persist.hasHydrated();
 
 function useHydrated() {
   return useSyncExternalStore(subscribeHydration, isHydrated, isHydrated);
+}
+
+/** Back button for screens opened directly (e.g. a deep link on web), where there is no history. */
+function HomeButton() {
+  const t = useTheme();
+  return (
+    <Link href="/" replace asChild>
+      <Pressable accessibilityLabel="Back to home" hitSlop={8} style={{ paddingHorizontal: 8 }}>
+        <Ionicons name="chevron-back" size={26} color={t.primary} />
+      </Pressable>
+    </Link>
+  );
 }
 
 export default function RootLayout() {
@@ -37,7 +50,12 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={{ ...navTheme, colors: { ...navTheme.colors, background: t.bg, card: t.surface } }}>
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerTintColor: t.primary, headerTitleStyle: { color: t.text } }}>
+      <Stack
+        screenOptions={({ navigation }) => ({
+          headerTintColor: t.primary,
+          headerTitleStyle: { color: t.text },
+          ...(navigation.canGoBack() ? null : { headerLeft: () => <HomeButton /> }),
+        })}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="account" options={{ title: 'Account & sync' }} />

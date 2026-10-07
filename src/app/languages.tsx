@@ -1,4 +1,6 @@
 import { router } from 'expo-router';
+
+import { goBack } from '@/lib/nav';
 import { useState } from 'react';
 
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
@@ -14,7 +16,7 @@ export default function LanguagesScreen() {
 
   const choose = (c: string) => {
     setSettings({ activeLang: c });
-    router.back();
+    goBack();
   };
 
   const add = () => {

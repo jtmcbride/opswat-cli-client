@@ -1,8 +1,9 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CoverageBar } from '@/components/CoverageBar';
+import { goBack } from '@/lib/nav';
 import { ExplainButton } from '@/components/ExplainButton';
 import { SayIt } from '@/components/SayIt';
 import { glossFor, Sentence } from '@/components/Sentence';
@@ -97,7 +98,7 @@ export default function ReaderScreen() {
   const remove = () => {
     const doIt = () => {
       removeText(text.id);
-      router.back();
+      goBack();
     };
     if (Platform.OS === 'web') {
       if (globalThis.confirm?.('Delete this text?')) doIt();

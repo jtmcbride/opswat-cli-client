@@ -1,8 +1,9 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Switch } from 'react-native';
 
 import { SpeakButton } from '@/components/SpeakButton';
+import { goBack } from '@/lib/nav';
 import { Button, Card, Input, Row, Screen, T } from '@/components/ui';
 import { InflectionTables } from '@/components/InflectionTables';
 import { SayIt } from '@/components/SayIt';
@@ -103,7 +104,7 @@ export default function EditWordScreen() {
           disabled={!text.trim()}
           onPress={() => {
             updateWord(word.id, { word: text.trim(), gloss: gloss.trim() });
-            router.back();
+            goBack();
           }}
         />
         <Button
@@ -112,7 +113,7 @@ export default function EditWordScreen() {
           style={{ flex: 1 }}
           onPress={() => {
             removeWord(word.id);
-            router.back();
+            goBack();
           }}
         />
       </Row>
