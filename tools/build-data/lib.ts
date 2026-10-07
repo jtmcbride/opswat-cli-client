@@ -4,7 +4,7 @@
  * - glosses and inflections (English Wiktionary via kaikki.org/wiktextract; CC BY-SA)
  * - sentence pairs (Tatoeba; CC BY 2.0 FR)
  */
-import type { GeneratedDictionary } from '../../src/data/format';
+import type { GeneratedDictionary, Inflections } from '../../src/data/format';
 import { DictIndex } from '../../src/lib/dictionary';
 import type { DictEntry, SentencePair } from '../../src/lib/types';
 
@@ -19,7 +19,8 @@ export interface WikiEntry {
   word: string;
   pos: string;
   senses?: WikiSense[];
-  forms?: { form: string; tags?: string[] }[];
+  forms?: { form: string; tags?: string[]; source?: string }[];
+  head_templates?: { expansion?: string }[];
 }
 
 const POS: Record<string, string> = {
@@ -39,14 +40,32 @@ const POS: Record<string, string> = {
 };
 const SKIP_SENSE_TAGS = new Set(['obsolete', 'archaic', 'dated', 'rare', 'historical', 'misspelling', 'nonstandard']);
 const SKIP_FORM_TAGS = new Set(['table-tags', 'inflection-template', 'class', 'romanization', 'error-unrecognized-form']);
+/** Forms with these tags are variants, not part of a learner's inflection table. */
+const SKIP_TABLE_TAGS = new Set([
+  ...SKIP_FORM_TAGS,
+  'alternative',
+  'obsolete',
+  'archaic',
+  'dated',
+  'rare',
+  'nonstandard',
+  'dialectal',
+  'diminutive',
+  'augmentative',
+  'pejorative',
+  'endearing',
+  'multiword-construction',
+  'abbreviation',
+  'misspelling',
+  'pronunciation-spelling',
+]);
+const MAX_TABLE_FORMS = 90;
+const GENDERS: Record<string, string> = { masculine: 'm', feminine: 'f', neuter: 'n' };
 const MAX_GLOSSES = 3;
 const MAX_GLOSS_LEN = 60;
 const MAX_TOTAL_GLOSS = 70;
 /** Glosses that describe grammar rather than translate; used only if nothing better exists. */
 const DESCRIPTIVE = /^(used|indicates?|denotes|forms?|expresses|introduces|substitutes|links|marks|refers)\b/i;
-/** Inflected forms that collide with a rare noun/interjection (French "est" = east) count as the inflection. */
-const WEAK_LEMMA_POS = new Set(['n', 'intj']);
-const STRONG_TARGET_POS = new Set(['v', 'art', 'det', 'pron']);
 
 const lower = (s: string) => s.toLocaleLowerCase();
 
@@ -55,6 +74,10 @@ interface LemmaRecord {
   pos: string;
   glosses: string[];
   forms: Set<string>;
+  /** Grammatical gender for nouns: m, f, n, or a combination like "mf". */
+  gender?: string;
+  /** Inflection table: [form, tags]. */
+  table: [string, string[]][];
   /** True once a lowercase spelling has been seen ("a" vs "A", "ce" vs "CE"). */
   lowercase: boolean;
 }
@@ -88,14 +111,18 @@ export class WikiIndex {
     if (!glosses.length) return;
 
     const isLower = entry.word === key;
+    const gender = pos === 'n' ? genderOf(entry) : undefined;
+    const table = inflectionTable(entry);
     let rec = this.lemmas.get(key);
     if (!rec) {
-      this.lemmas.set(key, (rec = { display: entry.word, pos, glosses, forms: new Set(), lowercase: isLower }));
+      this.lemmas.set(key, (rec = { display: entry.word, pos, glosses, forms: new Set(), lowercase: isLower, gender, table }));
     } else if (isLower && !rec.lowercase) {
       // Prefer the lowercase word's meaning over an abbreviation or proper noun ("a" over "A").
-      Object.assign(rec, { display: entry.word, pos, glosses: [...glosses, ...rec.glosses], lowercase: true });
+      Object.assign(rec, { display: entry.word, pos, glosses: [...glosses, ...rec.glosses], lowercase: true, gender, table });
     } else {
       rec.glosses.push(...glosses);
+      if (!rec.table.length) rec.table = table;
+      rec.gender ??= gender;
     }
     for (const f of entry.forms ?? []) {
       if (!f.form || /\s/.test(f.form) || f.tags?.some((t) => SKIP_FORM_TAGS.has(t))) continue;
@@ -108,6 +135,102 @@ export class WikiIndex {
       set.add(key);
     }
   }
+}
+
+const CYRILLIC = /\p{Script=Cyrillic}/u;
+
+/** Removes Serbo-Croatian tone and length marks ("kȕća" -> "kuća") but keeps č, ć, š, ž and đ. */
+export function stripTones(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/([aeiourAEIOUR])[\u0300\u0301\u0302\u0304\u0306\u030F\u0311]+/g, '$1')
+    .normalize('NFC');
+}
+
+/**
+ * Croatian comes from Wiktionary's Serbo-Croatian entries: keep the Latin script, drop tone marks
+ * (Croatian text doesn't write them), and drop senses marked Ekavian (Serbian; Croatian is
+ * ijekavian). Verb tables lose fused future forms ("gledaću" is Serbian; Croatian writes "gledat
+ * ću") and get back the person tags the extraction misses. Returns null for entries with nothing
+ * left.
+ */
+export function cleanSerboCroatian(entry: WikiEntry): WikiEntry | null {
+  if (CYRILLIC.test(entry.word)) return null;
+  const targets = (list?: { word: string }[]) => list?.map((t) => ({ word: stripTones(t.word) }));
+  const senses = (entry.senses ?? [])
+    .filter((s) => !s.tags?.includes('Ekavian'))
+    .map((s) => ({
+      ...s,
+      glosses: s.glosses?.map(stripTones),
+      form_of: targets(s.form_of),
+      alt_of: targets(s.alt_of),
+    }));
+  if (entry.senses?.length && !senses.length) return null;
+  let forms = entry.forms
+    ?.filter((f) => f.form && !CYRILLIC.test(f.form))
+    .map((f) => ({ ...f, form: stripTones(f.form) }));
+  if (entry.pos === 'verb' && forms) forms = fixVerbPersons(forms.filter((f) => !f.tags?.includes('future-i')));
+  return { ...entry, word: stripTones(entry.word), senses, forms };
+}
+
+type WikiForm = NonNullable<WikiEntry['forms']>[number];
+const PERSONS = ['first-person', 'second-person', 'third-person'];
+
+/**
+ * Serbo-Croatian conjugation tables come through with "third-person" but without first and second
+ * person ("gledam" and "gledaš" are both just "present singular"). Within each tense and number,
+ * the person-less forms are first person then second person, each with the same number of variants;
+ * a lone imperative singular is second person.
+ */
+export function fixVerbPersons(forms: WikiForm[]): WikiForm[] {
+  const groups = new Map<string, WikiForm[]>();
+  for (const f of forms) {
+    const tags = f.tags ?? [];
+    if (!tags.includes('singular') && !tags.includes('plural')) continue;
+    if (tags.some((t) => PERSONS.includes(t))) continue;
+    const key = [...tags].sort().join(' ');
+    groups.set(key, [...(groups.get(key) ?? []), f]);
+  }
+  const persons = new Map<WikiForm, string>();
+  for (const [key, list] of groups) {
+    if (list.length === 1 && key.split(' ').includes('imperative') && key.split(' ').includes('singular')) {
+      persons.set(list[0], 'second-person');
+    } else if (list.length % 2 === 0) {
+      list.forEach((f, i) => persons.set(f, i < list.length / 2 ? 'first-person' : 'second-person'));
+    }
+  }
+  return forms.map((f) => (persons.has(f) ? { ...f, tags: [...(f.tags ?? []), persons.get(f)!] } : f));
+}
+
+/** Gender from the headword line ("casa f (plural casas)", "Haus n (strong, …)") or sense tags. */
+export function genderOf(entry: WikiEntry): string | undefined {
+  const head = entry.head_templates?.[0]?.expansion ?? '';
+  const m = /^\S+\s+([mfn])(?:\s+or\s+([mfn]))?(?=[\s,(]|$)/.exec(head);
+  if (m) return [...new Set([m[1], m[2]].filter(Boolean))].sort().join('');
+  const tags = new Set((entry.senses ?? []).flatMap((s) => s.tags ?? []));
+  const g = Object.keys(GENDERS).filter((t) => tags.has(t)).map((t) => GENDERS[t]);
+  return g.length ? g.sort().join('') : undefined;
+}
+
+/** Learner-relevant inflections (conjugations, plurals, cases), without variants and duplicates. */
+export function inflectionTable(entry: WikiEntry): [string, string[]][] {
+  const out: [string, string[]][] = [];
+  const seen = new Set<string>();
+  // Prefer the full conjugation/declension table; headword-line forms are only a summary of it.
+  const all = entry.forms ?? [];
+  const fromTables = all.filter((f) => f.source && /conjugation|declension|inflection/i.test(f.source));
+  for (const f of fromTables.length ? fromTables : all) {
+    const tags = f.tags ?? [];
+    if (!f.form || !tags.length || /\s/.test(f.form) || f.form === '-' || f.form === '—') continue;
+    // Region names (capitalized tags like "Tuscany") mark regional variants.
+    if (tags.some((t) => SKIP_TABLE_TAGS.has(t) || /^[A-Z]/.test(t))) continue;
+    const key = `${f.form}|${tags.join(' ')}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push([f.form, tags]);
+    if (out.length >= MAX_TABLE_FORMS) break;
+  }
+  return out;
 }
 
 export function cleanGloss(raw: string | undefined): string | null {
@@ -166,26 +289,17 @@ export function rankLemmas(freq: [string, number][], wiki: WikiIndex, limit: num
     s.add(form);
   };
 
-  const dropped = new Set<string>();
+  // A word that is both a headword and an inflection ("casa" = house / form of "casar") counts as
+  // the headword. The app's curated starter lists decide the common exceptions ("est" is "être").
   for (const [w, c] of freq) {
     if (/\d/.test(w)) continue;
-    const formTarget = [...(wiki.formOf.get(w) ?? [])].find((t) => wiki.lemmas.has(t) && t !== w);
-    let target: string | undefined;
-    const own = wiki.lemmas.get(w);
-    if (own && formTarget && WEAK_LEMMA_POS.has(own.pos) && STRONG_TARGET_POS.has(wiki.lemmas.get(formTarget)!.pos)) {
-      // "est" is far more likely "is" (être) than "east"; drop the noun so the app resolves the form.
-      target = formTarget;
-      dropped.add(w);
-    } else {
-      target = own ? w : formTarget;
-    }
+    const target = wiki.lemmas.has(w) ? w : [...(wiki.formOf.get(w) ?? [])].find((t) => wiki.lemmas.has(t) && t !== w);
     if (!target) continue;
     credit.set(target, (credit.get(target) ?? 0) + c);
     addForm(target, w);
   }
 
   return [...credit.entries()]
-    .filter(([key]) => !dropped.has(key))
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([key], i) => {
@@ -195,6 +309,7 @@ export function rankLemmas(freq: [string, number][], wiki: WikiIndex, limit: num
         lemma: rec.display,
         gloss: pickGlosses(rec.glosses),
         pos: rec.pos,
+        ...(rec.gender ? { gender: rec.gender } : {}),
         rank: i + 1,
         ...(forms.length ? { forms } : {}),
       };
@@ -265,7 +380,36 @@ export function toGenerated(lang: string, entries: DictEntry[], sentences: Sente
   return {
     lang,
     sources,
-    entries: entries.map((e) => (e.forms?.length ? [e.lemma, e.gloss, e.pos ?? '', e.forms] : [e.lemma, e.gloss, e.pos ?? ''])),
+    entries: entries.map((e) => {
+      // Gender rides along in the part-of-speech field ("n:f") to keep the tuple format.
+      const pos = e.gender ? `${e.pos ?? ''}:${e.gender}` : (e.pos ?? '');
+      return e.forms?.length ? [e.lemma, e.gloss, pos, e.forms] : [e.lemma, e.gloss, pos];
+    }),
     sentences: sentences.map((s) => [s.text, s.translation]),
   };
+}
+
+/**
+ * Inflection tables for the selected lemmas, with tag lists interned so each form costs only a
+ * string and a number.
+ */
+export function toInflections(lang: string, entries: DictEntry[], wiki: WikiIndex): Inflections {
+  const tagIndex = new Map<string, number>();
+  const tags: string[] = [];
+  const lemmas: Inflections['lemmas'] = {};
+  for (const e of entries) {
+    const rec = wiki.lemmas.get(lower(e.lemma));
+    if (!rec?.table.length) continue;
+    lemmas[e.lemma] = rec.table.map(([form, t]) => {
+      const k = t.join(' ');
+      let i = tagIndex.get(k);
+      if (i === undefined) {
+        i = tags.length;
+        tags.push(k);
+        tagIndex.set(k, i);
+      }
+      return [form, i];
+    });
+  }
+  return { lang, tags, lemmas };
 }

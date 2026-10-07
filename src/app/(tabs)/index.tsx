@@ -4,11 +4,15 @@ import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MilestoneBanner, WeeklyRecap } from '@/components/Celebrations';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Input, Row, T } from '@/components/ui';
 import { MAX_WIDTH, space, useTheme } from '@/constants/theme';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
-import { isDue } from '@/lib/srs';
+import { useNow } from '@/hooks/useNow';
+import { dayKey, streak } from '@/lib/activity';
+import { buildQueue, directions } from '@/lib/queue';
+import { isDue, isLeech, isNew } from '@/lib/srs';
 import { normalize } from '@/lib/tokenize';
 import type { DictEntry, KnownWord } from '@/lib/types';
 import { useStore } from '@/store/useStore';
@@ -33,7 +37,14 @@ export default function WordsScreen() {
     () => (index && word.trim() ? index.search(word, 6).filter((e) => normalize(e.lemma) !== normalize(word)) : []),
     [index, word],
   );
-  const dueCount = useMemo(() => words.filter((w) => isDue(w.srs)).length, [words]);
+  const dailyNewLimit = useStore((s) => s.settings.dailyNewLimit);
+  const now = useNow();
+  const dirs = directions(useStore((s) => s.settings.reviewDirection));
+  const dueCount = useMemo(() => buildQueue(words, now, dailyNewLimit, dirs).cards.length, [words, now, dailyNewLimit, dirs]);
+  const dailyGoal = useStore((s) => s.settings.dailyGoal);
+  const days = useStore((s) => s.activity[lang]);
+  const streakDays = streak(days, now);
+  const todayReviews = days?.[dayKey(now)]?.reviews ?? 0;
   const shown = useMemo(() => {
     const f = normalize(filter);
     const list = f ? words.filter((w) => normalize(w.word).includes(f) || w.gloss.toLowerCase().includes(f)) : words;
@@ -93,9 +104,36 @@ export default function WordsScreen() {
 
   const header = (
     <View style={{ gap: space.lg, paddingBottom: space.md }}>
+      <Pressable
+        onPress={() => router.push('/stats')}
+        accessibilityRole="button"
+        accessibilityLabel="Progress and stats"
+        style={({ pressed }) => [styles.habit, { backgroundColor: t.surface, borderColor: t.border, opacity: pressed ? 0.7 : 1 }]}>
+        <Ionicons name="flame" size={22} color={streakDays > 0 ? t.accent : t.textMuted} />
+        <View style={{ flex: 1 }}>
+          <T style={{ fontWeight: '600' }}>
+            {streakDays > 0 ? `${streakDays}-day streak` : 'Start a streak today'}
+          </T>
+          <T variant="small">
+            Today {todayReviews} / {dailyGoal} reviews
+          </T>
+        </View>
+        <View style={[styles.goalTrack, { backgroundColor: t.surfaceAlt }]}>
+          <View
+            style={{
+              width: `${Math.min(1, todayReviews / Math.max(1, dailyGoal)) * 100}%`,
+              height: '100%',
+              backgroundColor: todayReviews >= dailyGoal ? t.success : t.primary,
+            }}
+          />
+        </View>
+        <Ionicons name="stats-chart" size={18} color={t.textMuted} />
+      </Pressable>
+      <MilestoneBanner lang={lang} />
+      <WeeklyRecap lang={lang} />
       <Row style={{ justifyContent: 'space-between' }}>
         <T variant="muted">
-          {words.length} known · {dueCount} due
+          {words.length} words · {dueCount} to study
         </T>
         <Row>
           <Chip label="One" selected={mode === 'single'} onPress={() => setMode('single')} />
@@ -153,7 +191,11 @@ export default function WordsScreen() {
       {words.length < 20 && index && index.size > 0 && (
         <Card>
           <T variant="heading">Just starting?</T>
-          <T variant="muted">Add the most common words from the dictionary. You can remove any you don&apos;t know.</T>
+          <T variant="muted">
+            Already know some words? Take a 2-minute placement test. Or add the most common words and remove any you
+            don&apos;t know.
+          </T>
+          <Button title="Placement test" icon="school-outline" onPress={() => router.push('/placement')} />
           <Row>
             <Button compact variant="secondary" title="+ 25 words" onPress={() => addStarter(25)} />
             <Button compact variant="secondary" title="+ 100 words" onPress={() => addStarter(100)} />
@@ -193,7 +235,9 @@ export default function WordsScreen() {
 
 function WordRow({ word }: { word: KnownWord }) {
   const t = useTheme();
-  const due = isDue(word.srs);
+  const states = word.produce ? [word.srs, word.produce] : [word.srs];
+  const due = !word.suspended && states.some((s) => !isNew(s) && isDue(s));
+  const tag = word.suspended ? 'suspended' : states.some(isLeech) ? 'leech' : isNew(word.srs) ? 'new' : null;
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/word/[id]', params: { id: word.id } })}
@@ -204,6 +248,11 @@ function WordRow({ word }: { word: KnownWord }) {
           {word.gloss || '(no meaning)'}
         </T>
       </View>
+      {tag && (
+        <T variant="small" style={[styles.tag, { backgroundColor: tag === 'leech' ? t.accentSoft : t.surfaceAlt }]}>
+          {tag}
+        </T>
+      )}
       <SpeakButton text={word.word} lang={word.lang} size={20} id={`word:${word.id}`} />
       {due && <View style={[styles.dot, { backgroundColor: t.accent }]} />}
       <Ionicons name="chevron-forward" size={18} color={t.textMuted} />
@@ -216,4 +265,14 @@ const styles = StyleSheet.create({
   suggestion: { flexDirection: 'row', gap: space.sm, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 8 },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 12, paddingHorizontal: 4 },
   dot: { width: 8, height: 8, borderRadius: 4 },
+  tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, overflow: 'hidden' },
+  habit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  goalTrack: { width: 64, height: 8, borderRadius: 4, overflow: 'hidden' },
 });

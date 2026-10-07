@@ -3,16 +3,19 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { BUILTIN_LANGUAGES } from '@/data';
+import { dayKey, record, type ActivityLog } from '@/lib/activity';
 import { DEFAULT_MODEL, type ChatTurn } from '@/lib/ai';
-import { newSrs, schedule } from '@/lib/srs';
-import { normalize } from '@/lib/tokenize';
+import { GRADE_VALUE, knownSrs, migrateSrs, newSrs, schedule } from '@/lib/srs';
+import { normalize, wordKey } from '@/lib/tokenize';
 import type {
+  CardDir,
   CustomLanguage,
   DictEntry,
   Grade,
   KnownWord,
   LangCode,
   ReadingText,
+  ReviewEntry,
   SentencePair,
   Settings,
   UserDictMeta,
@@ -32,31 +35,52 @@ export interface AppState {
   /** AI-generated practice sentences per language. */
   extraSentences: Record<LangCode, SentencePair[]>;
   chats: Record<LangCode, ChatTurn[]>;
+  /** Active role-play setup per language (tutor instructions); absent = free conversation. */
+  chatScenarios: Record<LangCode, string | undefined>;
   texts: ReadingText[];
+  activity: ActivityLog;
+  /** Every review, by local day, for fitting the scheduler to this learner. */
+  reviewLog: Record<string, ReviewEntry[]>;
+  /** Milestone ids already celebrated (or reached before milestones existed), per language. */
+  celebrated: Record<LangCode, string[]>;
+  /** Monday (day key) of the week whose recap was dismissed, per language. */
+  weeklySeen: Record<LangCode, string>;
 
   setSettings: (patch: Partial<Settings>) => void;
   addWord: (lang: LangCode, word: string, gloss: string, context?: SentencePair) => KnownWord | null;
-  addWords: (lang: LangCode, items: { word: string; gloss: string }[]) => number;
-  updateWord: (id: string, patch: Partial<Pick<KnownWord, 'word' | 'gloss'>>) => void;
+  addWords: (lang: LangCode, items: { word: string; gloss: string }[], opts?: { known?: boolean }) => number;
+  updateWord: (id: string, patch: Partial<Pick<KnownWord, 'word' | 'gloss' | 'suspended'>>) => void;
   removeWord: (id: string) => void;
-  gradeWord: (id: string, grade: Grade) => void;
+  gradeWord: (id: string, grade: Grade, dir?: CardDir) => void;
   addCustomLanguage: (lang: CustomLanguage) => void;
   importDictionary: (lang: LangCode, name: string, entries: DictEntry[]) => Promise<void>;
   toggleUserDict: (id: string) => void;
   removeUserDict: (id: string) => Promise<void>;
   markSentenceSeen: (lang: LangCode, key: number) => void;
   addExtraSentences: (lang: LangCode, sentences: SentencePair[]) => void;
-  setChat: (lang: LangCode, turns: ChatTurn[]) => void;
+  setChat: (lang: LangCode, turns: ChatTurn[], scenario?: string | null) => void;
   addText: (text: Omit<ReadingText, 'id' | 'createdAt'>) => ReadingText;
   addTextGlosses: (id: string, glosses: Record<string, string>) => void;
   removeText: (id: string) => void;
   restore: (backup: Backup) => void;
+  markCelebrated: (lang: LangCode, ids: string[]) => void;
+  dismissWeekly: (lang: LangCode, weekStart: string) => void;
 }
 
 export type Backup = Pick<
   AppState,
   'settings' | 'customLanguages' | 'words' | 'userDicts' | 'extraSentences' | 'chats'
-> & Partial<Pick<AppState, 'texts'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
+> & Partial<Pick<AppState, 'texts' | 'activity' | 'reviewLog'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
+
+const migrateWords = (words: KnownWord[]) =>
+  words.map((w) => ({ ...w, srs: migrateSrs(w.srs), ...(w.produce ? { produce: migrateSrs(w.produce) } : {}) }));
+
+/**
+ * v2 -> v3: words get separate production cards. Reviews used to mix recognition and recall
+ * exercises on one schedule, so words already in review carry that schedule over to both cards.
+ */
+const splitDirections = (words: KnownWord[]) =>
+  words.map((w) => (w.srs.state === 'review' && w.srs.reps >= 2 && !w.produce ? { ...w, produce: { ...w.srs } } : w));
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
@@ -66,12 +90,20 @@ export const useStore = create<AppState>()(
       settings: {
         activeLang: 'es',
         nativeLang: 'English',
-        reviewDirection: 'target',
+        reviewDirection: 'mixed',
         aiModel: DEFAULT_MODEL,
         speechRate: 'normal',
         autoSpeak: false,
         reviewStyle: 'mixed',
         listening: true,
+        retention: 0.9,
+        dailyNewLimit: 20,
+        dailyGoal: 20,
+        reminder: null,
+        speaking: true,
+        chatAutoSpeak: false,
+        fsrsWeights: null,
+        fsrsFit: null,
       },
       customLanguages: [],
       words: [],
@@ -79,7 +111,12 @@ export const useStore = create<AppState>()(
       recentSentences: {},
       extraSentences: {},
       chats: {},
+      chatScenarios: {},
       texts: [],
+      activity: {},
+      reviewLog: {},
+      celebrated: {},
+      weeklySeen: {},
 
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
@@ -88,6 +125,7 @@ export const useStore = create<AppState>()(
         if (!w) return null;
         const exists = get().words.some((k) => k.lang === lang && normalize(k.word) === normalize(w));
         if (exists) return null;
+        set((s) => ({ activity: record(s.activity, lang, Date.now(), { added: 1 }) }));
         const kw: KnownWord = {
           id: uid(),
           lang,
@@ -101,7 +139,7 @@ export const useStore = create<AppState>()(
         return kw;
       },
 
-      addWords: (lang, items) => {
+      addWords: (lang, items, opts) => {
         const seen = new Set(get().words.filter((k) => k.lang === lang).map((k) => normalize(k.word)));
         const now = Date.now();
         const added: KnownWord[] = [];
@@ -109,9 +147,16 @@ export const useStore = create<AppState>()(
           const n = normalize(word);
           if (!n || seen.has(n)) continue;
           seen.add(n);
-          added.push({ id: uid(), lang, word: word.trim(), gloss: gloss.trim(), addedAt: now, srs: newSrs(now) });
+          // Already-known words skip the new-card queue; their first check-ins are spread over 1–8 weeks.
+          const srs = opts?.known ? knownSrs(now, 7 + ((added.length * 7) % 50)) : newSrs(now);
+          added.push({ id: uid(), lang, word: word.trim(), gloss: gloss.trim(), addedAt: now, srs });
         }
-        if (added.length) set((s) => ({ words: [...s.words, ...added] }));
+        if (added.length)
+          set((s) => ({
+            words: [...s.words, ...added],
+            // Placement-test words aren't "added" learning activity.
+            activity: opts?.known ? s.activity : record(s.activity, lang, now, { added: added.length }),
+          }));
         return added.length;
       },
 
@@ -120,10 +165,21 @@ export const useStore = create<AppState>()(
 
       removeWord: (id) => set((s) => ({ words: s.words.filter((w) => w.id !== id) })),
 
-      gradeWord: (id, grade) =>
-        set((s) => ({
-          words: s.words.map((w) => (w.id === id ? { ...w, srs: schedule(w.srs, grade) } : w)),
-        })),
+      gradeWord: (id, grade, dir = 'recognize') =>
+        set((s) => {
+          const w = s.words.find((x) => x.id === id);
+          if (!w) return s;
+          const now = Date.now();
+          const before = dir === 'produce' ? (w.produce ?? newSrs(w.addedAt)) : w.srs;
+          const after = schedule(before, grade, now, { retention: s.settings.retention, weights: s.settings.fsrsWeights });
+          const entry: ReviewEntry = [now, wordKey(w.lang, w.word), dir === 'produce' ? 1 : 0, GRADE_VALUE[grade], before.state === 'new' ? 1 : 0];
+          const day = dayKey(now);
+          return {
+            activity: record(s.activity, w.lang, now, { reviews: 1, again: grade === 'again' ? 1 : 0 }),
+            words: s.words.map((x) => (x.id === id ? { ...x, ...(dir === 'produce' ? { produce: after } : { srs: after }) } : x)),
+            reviewLog: { ...s.reviewLog, [day]: [...(s.reviewLog[day] ?? []), entry] },
+          };
+        }),
 
       addCustomLanguage: (lang) =>
         set((s) =>
@@ -162,7 +218,12 @@ export const useStore = create<AppState>()(
           return { extraSentences: { ...s.extraSentences, [lang]: [...existing, ...fresh] } };
         }),
 
-      setChat: (lang, turns) => set((s) => ({ chats: { ...s.chats, [lang]: turns } })),
+      setChat: (lang, turns, scenario) =>
+        set((s) => ({
+          chats: { ...s.chats, [lang]: turns },
+          // undefined keeps the current scenario; null clears it.
+          chatScenarios: scenario === undefined ? s.chatScenarios : { ...s.chatScenarios, [lang]: scenario ?? undefined },
+        })),
 
       addText: (text) => {
         const t: ReadingText = { ...text, id: uid(), createdAt: Date.now() };
@@ -177,30 +238,48 @@ export const useStore = create<AppState>()(
 
       removeText: (id) => set((s) => ({ texts: s.texts.filter((t) => t.id !== id) })),
 
+      markCelebrated: (lang, ids) =>
+        set((s) => ({ celebrated: { ...s.celebrated, [lang]: [...new Set([...(s.celebrated[lang] ?? []), ...ids])] } })),
+
+      dismissWeekly: (lang, weekStart) => set((s) => ({ weeklySeen: { ...s.weeklySeen, [lang]: weekStart } })),
+
       restore: (backup) => {
         for (const [id, entries] of Object.entries(backup.dictEntries ?? {})) void saveDictEntries(id, entries);
         set({
           settings: { ...get().settings, ...backup.settings },
           customLanguages: backup.customLanguages ?? [],
-          words: backup.words ?? [],
+          words: migrateWords(backup.words ?? []),
           userDicts: backup.userDicts ?? [],
           extraSentences: backup.extraSentences ?? {},
           chats: backup.chats ?? {},
           texts: backup.texts ?? [],
+          activity: backup.activity ?? {},
+          reviewLog: backup.reviewLog ?? {},
           recentSentences: {},
         });
       },
     }),
     {
       name: 'lingo.state',
-      version: 1,
+      version: 3,
+      migrate: (persisted, version) => {
+        const p = (persisted ?? {}) as Partial<AppState>;
+        // v1 -> v2: SM-2 scheduling state becomes FSRS state.
+        if (version < 2 && p.words) p.words = migrateWords(p.words);
+        if (version < 3) {
+          if (p.words && p.settings?.reviewStyle !== 'flip') p.words = splitDirections(p.words);
+          // "Word → meaning" used to still mix in recall exercises; that's now the production card.
+          if (p.settings && p.settings.reviewDirection !== 'native') p.settings = { ...p.settings, reviewDirection: 'mixed' };
+        }
+        return p as AppState;
+      },
       storage: createJSONStorage(() => AsyncStorage),
       // Deep-merge settings so fields added in later versions get their defaults.
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<AppState>;
         return { ...current, ...p, settings: { ...current.settings, ...p.settings } };
       },
-      partialize: ({ settings, customLanguages, words, userDicts, recentSentences, extraSentences, chats, texts }) => ({
+      partialize: ({
         settings,
         customLanguages,
         words,
@@ -208,7 +287,26 @@ export const useStore = create<AppState>()(
         recentSentences,
         extraSentences,
         chats,
+        chatScenarios,
         texts,
+        activity,
+        reviewLog,
+        celebrated,
+        weeklySeen,
+      }) => ({
+        settings,
+        customLanguages,
+        words,
+        userDicts,
+        recentSentences,
+        extraSentences,
+        chats,
+        chatScenarios,
+        texts,
+        activity,
+        reviewLog,
+        celebrated,
+        weeklySeen,
       }),
     },
   ),
@@ -216,7 +314,8 @@ export const useStore = create<AppState>()(
 
 export function useLanguages() {
   const custom = useStore((s) => s.customLanguages);
-  return [...BUILTIN_LANGUAGES, ...custom];
+  // A language added by hand before it became built-in (e.g. Croatian) shows once, as built-in.
+  return [...BUILTIN_LANGUAGES, ...custom.filter((c) => !BUILTIN_LANGUAGES.some((b) => b.code === c.code))];
 }
 
 export function languageName(code: LangCode, custom: CustomLanguage[]) {

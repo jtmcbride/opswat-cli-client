@@ -2,6 +2,8 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { ExplainButton } from '@/components/ExplainButton';
+import { SayIt } from '@/components/SayIt';
 import { glossFor, Sentence } from '@/components/Sentence';
 import { SpeakButton } from '@/components/SpeakButton';
 import { Button, Card, Chip, Empty, Row, Screen, T } from '@/components/ui';
@@ -10,6 +12,7 @@ import { useApiKey } from '@/hooks/useApiKey';
 import { useDictionary, useKnown } from '@/hooks/useDictionary';
 import { generateSentences } from '@/lib/ai';
 import { distractors, pickExercise, seededRandom, shuffle, type Exercise } from '@/lib/picker';
+import { withArticle } from '@/lib/grammar';
 import { normalize } from '@/lib/tokenize';
 import type { DictEntry } from '@/lib/types';
 import { languageName, useStore } from '@/store/useStore';
@@ -197,6 +200,15 @@ function LearnSession({ lang }: { lang: string }) {
           </T>
         )}
         {done && <T variant="muted">“{exercise.sentence.translation}”</T>}
+        {done && <SayIt target={exercise.sentence.text} lang={lang} />}
+        {done && (
+          <ExplainButton
+            key={exercise.sentenceIndex}
+            sentence={exercise.sentence.text}
+            translation={exercise.sentence.translation}
+            focus={target.lemma}
+          />
+        )}
       </Card>
 
       {!done && mode === 'choice' && (
@@ -215,7 +227,7 @@ function LearnSession({ lang }: { lang: string }) {
             <T style={{ color: correct ? t.success : t.danger, fontWeight: '700' }}>{correct ? 'Correct!' : 'Not quite'}</T>
           )}
           <T variant="heading">
-            {target.lemma} — {target.gloss}
+            {withArticle(lang, target.lemma, target.gender)} — {target.gloss}
           </T>
           <Row>
             <Button

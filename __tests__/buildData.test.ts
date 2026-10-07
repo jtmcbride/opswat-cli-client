@@ -1,4 +1,19 @@
-import { cleanGloss, parseFrequencyList, pickGlosses, rankLemmas, selectSentences, toGenerated, WikiIndex } from '../tools/build-data/lib';
+import {
+  cleanGloss,
+  cleanSerboCroatian,
+  fixVerbPersons,
+  stripTones,
+  genderOf,
+  inflectionTable,
+  parseFrequencyList,
+  pickGlosses,
+  rankLemmas,
+  selectSentences,
+  toGenerated,
+  toInflections,
+  WikiIndex,
+} from '../tools/build-data/lib';
+import { parseGenerated } from '@/data/format';
 import { DictIndex } from '@/lib/dictionary';
 
 function wiki() {
@@ -61,14 +76,13 @@ describe('gloss and lemma quality', () => {
     expect(w.lemmas.get('a')!.glosses[0]).toBe('to');
   });
 
-  it('treats a rare noun that is also a verb form as the verb form', () => {
+  it('keeps nouns that are also verb forms ("casa" = house / form of "casar")', () => {
     const w = new WikiIndex();
-    w.add({ word: 'être', pos: 'verb', senses: [{ glosses: ['to be'] }] });
-    w.add({ word: 'est', pos: 'noun', senses: [{ glosses: ['east'] }] });
-    w.add({ word: 'est', pos: 'verb', senses: [{ glosses: ['third-person singular of être'], form_of: [{ word: 'être' }] }] });
-    const entries = rankLemmas([['est', 100], ['être', 5]], w, 10);
-    expect(entries.map((e) => e.lemma)).toEqual(['être']);
-    expect(entries[0].forms).toEqual(['est']);
+    w.add({ word: 'casar', pos: 'verb', senses: [{ glosses: ['to marry'] }] });
+    w.add({ word: 'casa', pos: 'noun', senses: [{ glosses: ['house'] }] });
+    w.add({ word: 'casa', pos: 'verb', senses: [{ glosses: ['third-person singular of casar'], form_of: [{ word: 'casar' }] }] });
+    const entries = rankLemmas([['casa', 100], ['casar', 5]], w, 10);
+    expect(entries.map((e) => e.lemma)).toEqual(['casa', 'casar']);
   });
 
   it('maps Italian clitic compounds to their infinitive', () => {
@@ -119,5 +133,117 @@ describe('toGenerated', () => {
     const g = toGenerated('es', [{ lemma: 'a', gloss: 'b', pos: 'n' }, { lemma: 'c', gloss: 'd', forms: ['e'] }], [{ text: 'x', translation: 'y' }], []);
     expect(g.entries).toEqual([['a', 'b', 'n'], ['c', 'd', '', ['e']]]);
     expect(g.sentences).toEqual([['x', 'y']]);
+  });
+});
+
+describe('grammar data', () => {
+  // Shapes taken from real kaikki.org entries.
+  const haus = {
+    word: 'Haus',
+    pos: 'noun',
+    head_templates: [{ expansion: 'Haus n (strong, genitive Hauses, plural Häuser)' }],
+    senses: [{ glosses: ['house'], tags: ['neuter', 'strong'] }],
+    forms: [
+      { form: 'Hauses', tags: ['genitive'] },
+      { form: 'Häuser', tags: ['plural'] },
+      { form: 'Häuschen', tags: ['diminutive', 'neuter'] },
+      { form: 'strong', tags: ['table-tags'] },
+      { form: 'Haus', tags: ['nominative', 'singular'] },
+      { form: 'Häusern', tags: ['dative', 'definite', 'plural'] },
+      { form: 'Häusken', tags: ['Ruhrdeutsch', 'also', 'diminutive', 'neuter'] },
+      { form: 'Hauß', tags: ['alternative', 'obsolete'] },
+    ],
+  };
+
+  it('reads gender from the headword line or sense tags', () => {
+    expect(genderOf(haus)).toBe('n');
+    expect(genderOf({ word: 'casa', pos: 'noun', head_templates: [{ expansion: 'casa f (plural casas)' }] })).toBe('f');
+    expect(genderOf({ word: 'artista', pos: 'noun', head_templates: [{ expansion: 'artista m or f (plural artistas)' }] })).toBe('fm');
+    expect(genderOf({ word: 'x', pos: 'noun', senses: [{ tags: ['masculine'] }] })).toBe('m');
+    expect(genderOf({ word: 'x', pos: 'noun' })).toBeUndefined();
+  });
+
+  it('keeps learner-relevant inflections and drops variants and markers', () => {
+    expect(inflectionTable(haus).map(([f]) => f)).toEqual(['Hauses', 'Häuser', 'Haus', 'Häusern']);
+    const verb = {
+      word: 'tener',
+      pos: 'verb',
+      forms: [
+        { form: 'tengo', tags: ['first-person', 'indicative', 'present', 'singular'] },
+        { form: 'tengo', tags: ['first-person', 'indicative', 'present', 'singular'] },
+        { form: 'haber tenido', tags: ['infinitive', 'perfect'] },
+      ],
+    };
+    expect(inflectionTable(verb)).toEqual([['tengo', ['first-person', 'indicative', 'present', 'singular']]]);
+  });
+
+  it('carries gender through the generated format and interns inflection tags', () => {
+    const w = new WikiIndex();
+    w.add(haus);
+    const entries = rankLemmas([['haus', 10]], w, 10);
+    expect(entries[0]).toMatchObject({ lemma: 'Haus', gender: 'n' });
+    const parsed = parseGenerated(toGenerated('de', entries, [], []));
+    expect(parsed.entries[0]).toMatchObject({ lemma: 'Haus', pos: 'n', gender: 'n' });
+    const infl = toInflections('de', entries, w);
+    expect(infl.lemmas.Haus[0]).toEqual(['Hauses', infl.tags.indexOf('genitive')]);
+  });
+});
+
+describe('Serbo-Croatian (Croatian) data', () => {
+  it('strips tone marks but keeps Croatian letters', () => {
+    expect(stripTones('kȕća')).toBe('kuća');
+    expect(stripTones('glȅdām')).toBe('gledam');
+    expect(stripTones('pȑst')).toBe('prst');
+    expect(stripTones('čćđšž ČĆĐŠŽ')).toBe('čćđšž ČĆĐŠŽ');
+  });
+
+  it('keeps Latin-script ijekavian entries only', () => {
+    expect(cleanSerboCroatian({ word: 'кућа', pos: 'noun', senses: [{ glosses: ['house'] }] })).toBeNull();
+    expect(cleanSerboCroatian({ word: 'mleko', pos: 'noun', senses: [{ glosses: ['milk'], tags: ['Ekavian'] }] })).toBeNull();
+    const e = cleanSerboCroatian({
+      word: 'kuća',
+      pos: 'noun',
+      senses: [{ glosses: ['house'] }],
+      forms: [
+        { form: 'kȕća', tags: ['canonical'] },
+        { form: 'кућа', tags: ['Cyrillic'] },
+        { form: 'kȕće', tags: ['genitive', 'singular'] },
+      ],
+    })!;
+    expect(e.forms?.map((f) => f.form)).toEqual(['kuća', 'kuće']);
+  });
+
+  it('drops Serbian fused futures and restores first/second person in verb tables', () => {
+    const verb = cleanSerboCroatian({
+      word: 'gledati',
+      pos: 'verb',
+      senses: [{ glosses: ['to watch (compare glȅdati)'] }],
+      forms: [
+        { form: 'glȅdām', tags: ['present', 'singular'] },
+        { form: 'gledaš', tags: ['present', 'singular'] },
+        { form: 'gleda', tags: ['present', 'singular', 'third-person'] },
+        { form: 'gledaću', tags: ['future', 'future-i', 'singular'] },
+        { form: 'gledaj', tags: ['imperative', 'singular'] },
+        { form: 'gledajmo', tags: ['imperative', 'plural'] },
+        { form: 'gledajte', tags: ['imperative', 'plural'] },
+      ],
+    })!;
+    expect(verb.senses?.[0].glosses).toEqual(['to watch (compare gledati)']);
+    expect(verb.forms?.map((f) => `${f.form}: ${f.tags?.filter((t) => t.endsWith('-person')).join('')}`)).toEqual([
+      'gledam: first-person',
+      'gledaš: second-person',
+      'gleda: third-person',
+      'gledaj: second-person',
+      'gledajmo: first-person',
+      'gledajte: second-person',
+    ]);
+    // Variants of each person come in equal runs.
+    const imperfect = ['bijah', 'bjeh', 'bijaše', 'bješe'].map((form) => ({ form, tags: ['imperfect', 'singular'] }));
+    expect(fixVerbPersons(imperfect).map((f) => f.tags?.at(-1))).toEqual([
+      'first-person',
+      'first-person',
+      'second-person',
+      'second-person',
+    ]);
   });
 });

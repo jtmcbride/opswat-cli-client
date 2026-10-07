@@ -117,21 +117,53 @@ Differences from the plan:
    coverage, tap-to-gloss (AI lookup for words missing from the dictionary), per-paragraph audio,
    and a list of the text's new words to add.
 
-## 10. Roadmap (not yet built)
+## 10. Roadmap
 
-4. **Better scheduling** — replace SM-2 with FSRS (fewer reviews for the same retention); daily
-   new-word limit; detect and flag "leeches" (words failed repeatedly); optional separate
-   scheduling per direction/exercise type.
-5. **Grammar awareness** — full conjugation/declension tables (e.g. from Wiktionary inflection
-   data) so all forms of a known lemma are recognised; show gender and conjugation on word pages;
-   an AI "explain this sentence" button.
-6. **Speaking practice** — speech recognition to check pronunciation of words and sentences;
-   shadowing mode (listen, repeat, compare).
-7. **Chat that feeds review** — save the tutor's corrections as review cards; role-play scenarios
-   (café, directions, shopping); hands-free voice mode with TTS + speech recognition.
-8. **Placement test** — adaptive check through frequency bands to bulk-mark known words for
-   non-beginners (replaces the "+25/+100 words" shortcut).
-9. **Habit features** — daily goal, streaks, reminder notifications (expo-notifications), and
-   stats: known-word growth, retention rate, review forecast.
-10. **Accounts and sync** — optional sign-in with cloud sync across devices (currently local-only
-    with JSON backup).
+4. ~~**Better scheduling**~~ — done in v3–v4: FSRS-5 with adjustable target recall, daily new-card
+   limit, leech flagging and suspend. v4: separate recognition and production cards per word
+   (production joins once the word is learned; siblings never share a day), a synced review log,
+   and on-device fitting of the 19 FSRS parameters to that log (log-loss descent, regularized
+   toward the defaults, kept only if it predicts held-out cards better). Still open: separate
+   schedules per exercise type within a direction, and an "optimal retention" suggestion.
+5. ~~**Grammar awareness**~~ — done in v3–v4: noun gender/articles, conjugation and declension
+   tables on word pages (from Wiktionary, lazy-loaded), and an AI "Explain grammar" button. v4:
+   every form in the full tables is recognized when reading, in chat, in i+1 sentences and in
+   coverage (loaded in the background); curated forms win homographs without dropping the other
+   word ("paso" reads as "pasar", but "pasos" is still "paso"). Built-in sentences now resolve
+   100% of their words, checked in tests against the real generated data.
+6. ~~**Speaking practice**~~ — done in v3 (browsers with speech recognition: Chrome, Edge,
+   Safari): "Say it" with per-word feedback, speaking exercises in reviews, chat dictation and
+   read-aloud replies. Still open: the same in the native app (needs a speech-recognition module
+   and a development build).
+7. ~~**Chat that feeds review**~~ — done in v3: corrections shown under your messages and savable
+   as flashcards, tutor-supplied glosses for new words, seven role-play scenarios plus custom ones.
+   Voice mode moves to item 6.
+8. ~~**Placement test**~~ — done in v3: band-by-band check with spot checks; known words are
+   added in review state with check-ins spread over weeks.
+9. ~~**Habit features**~~ — done in v3–v4: daily goal, streak, Progress screen (retention, reviews
+   per day, upcoming reviews, words added) and daily reminders on iOS/Android. v4: best streak,
+   goal days, 16-week activity calendar, vocabulary strength tiers by memory stability (per card
+   direction), everyday coverage measured on the built-in sentence corpus with "learn next"
+   suggestions, and reminders scheduled a week ahead that skip a day once its goal is met and
+   name the streak at stake. Weekly summary (this week vs last on Progress; a dismissible recap of
+   last week on the Words tab when a new week starts) and milestones on five tracks (words in
+   deck, words mastered, best streak, reviews, everyday coverage) with a banner for new ones.
+   Milestones already passed when the feature arrives are recorded silently. Streak freezes:
+   decided against.
+10. ~~**Accounts and sync**~~ — done in v4 with Supabase (free tier): email-code sign-in, and
+    per-item sync of words, reviews, texts, chats, settings, progress and imported dictionaries.
+    Each item merges last-write-wins (same-day activity takes the larger tally); a server write
+    counter is the pull cursor so device clock skew can't hide changes. Sync is hidden in builds
+    without Supabase config. Still open: realtime push (currently syncs on change, on focus and
+    every 2 minutes), account deletion from the app (only synced data is deleted), and choosing
+    whether a sign-in merges or replaces local data.
+
+## 11. Languages added later
+
+- **Croatian (v4):** hand-written starter set (~300 words, 80+ sentences, nouns with gender), plus
+  generated data from Croatian subtitles, Wiktionary's Serbo-Croatian entries (Latin script,
+  ijekavian, tone marks stripped) and Tatoeba. Pronoun rows (ja, ti, on/ona/ono…) in conjugation
+  tables (person tags restored, Serbian fused futures dropped); nouns show gender as "kuća (f.)"
+  since Croatian has no articles. Declensions (Croatian and German) show as case tables per gender
+  and number. Still open: Croatian compound tenses (perfect "gledao sam", future "gledat ću") are
+  multi-word and not in the tables.

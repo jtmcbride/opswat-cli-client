@@ -1,7 +1,8 @@
 import { DictIndex } from '@/lib/dictionary';
-import { checkAnswer, chooseExercise, findContext, makeCloze } from '@/lib/recall';
+import { bestAnswer, checkAnswer, chooseExercise, findContext, makeCloze } from '@/lib/recall';
 import { newSrs } from '@/lib/srs';
-import type { KnownWord } from '@/lib/types';
+import type { CardDir, KnownWord } from '@/lib/types';
+import type { ReviewCard } from '@/lib/queue';
 
 const index = new DictIndex([
   [
@@ -21,7 +22,7 @@ const word = (w: string, reps = 2, extra: Partial<KnownWord> = {}): KnownWord =>
   word: w,
   gloss: '',
   addedAt: 0,
-  srs: { ...newSrs(0), reps },
+  srs: { ...newSrs(0), reps, state: reps === 0 ? 'new' : 'review', stability: reps ? 5 : 0 },
   ...extra,
 });
 
@@ -37,17 +38,39 @@ describe('checkAnswer', () => {
   });
 });
 
+describe('bestAnswer', () => {
+  it('takes the best of several recognition alternatives', () => {
+    expect(bestAnswer(['casa', 'esta', 'está'], 'está')).toEqual({ result: 'exact', input: 'está' });
+    expect(bestAnswer(['perro'], 'gato').result).toBe('wrong');
+  });
+});
+
+const card = (w: string, reps = 2, dir: CardDir = 'produce'): ReviewCard => {
+  const kw = word(w, reps);
+  return { word: kw, dir, srs: kw.srs, id: `${kw.id}:${dir}` };
+};
+
 describe('chooseExercise', () => {
   it('uses flip for new cards and flip-only style', () => {
-    expect(chooseExercise(word('libro', 0), { style: 'mixed', hasContext: true, canListen: true })).toBe('flip');
-    expect(chooseExercise(word('libro', 5), { style: 'flip', hasContext: true, canListen: true })).toBe('flip');
+    expect(chooseExercise(card('libro', 0), { style: 'mixed', hasContext: true, canListen: true })).toBe('flip');
+    expect(chooseExercise(card('libro', 5), { style: 'flip', hasContext: true, canListen: true })).toBe('flip');
   });
 
   it('only picks available exercises and is stable', () => {
     const opts = { style: 'mixed' as const, hasContext: false, canListen: false };
-    expect(chooseExercise(word('libro', 3), opts)).toBe('type');
-    const a = chooseExercise(word('libro', 3), { ...opts, hasContext: true, canListen: true });
-    expect(chooseExercise(word('libro', 3), { ...opts, hasContext: true, canListen: true })).toBe(a);
+    expect(chooseExercise(card('libro', 3), opts)).toBe('type');
+    const kinds = new Set(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((w) => chooseExercise(card(w, 3), { ...opts, canSpeak: true })),
+    );
+    expect(kinds).toEqual(new Set(['type', 'speak']));
+    const a = chooseExercise(card('libro', 3), { ...opts, hasContext: true, canListen: true });
+    expect(chooseExercise(card('libro', 3), { ...opts, hasContext: true, canListen: true })).toBe(a);
+  });
+
+  it('keeps recognition cards to flip and listening', () => {
+    const opts = { style: 'mixed' as const, hasContext: true, canListen: true, canSpeak: true };
+    const kinds = new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((w) => chooseExercise(card(w, 3, 'recognize'), opts)));
+    expect(kinds).toEqual(new Set(['flip', 'listen']));
   });
 });
 

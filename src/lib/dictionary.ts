@@ -6,6 +6,10 @@ export class DictIndex {
   readonly entries: DictEntry[] = [];
   private byLemma = new Map<string, DictEntry>();
   private formToLemma = new Map<string, string>();
+  /** Forms from full inflection tables: used to resolve words, not for autocomplete. */
+  private tableForms = new Map<string, string>();
+  /** Forms of curated entries, which win even over another entry with that headword. */
+  private curatedForms = new Map<string, string>();
 
   constructor(sources: DictEntry[][]) {
     let rank = 0;
@@ -21,6 +25,10 @@ export class DictIndex {
           // Keep the better (lower) frequency rank, take the newer gloss.
           entry.rank = Math.min(existing.rank ?? Infinity, entry.rank ?? Infinity);
           entry.forms = [...new Set([...(existing.forms ?? []), ...(entry.forms ?? [])])];
+          // Keep grammatical info from earlier sources when a later one (e.g. curated glosses) lacks it.
+          entry.pos ??= existing.pos;
+          // Gender only carries over to a noun (a curated adverb "no" isn't the noun "el no").
+          if (entry.pos === 'n') entry.gender ??= existing.gender;
           this.entries[this.entries.indexOf(existing)] = entry;
         } else {
           this.entries.push(entry);
@@ -32,6 +40,39 @@ export class DictIndex {
         }
       }
     }
+    const curated = this.entries.filter((e) => e.formsWin);
+    const curatedLemmas = new Set(curated.map((e) => normalize(e.lemma)));
+    for (const e of curated) {
+      for (const f of e.forms ?? []) {
+        const nf = normalize(f);
+        if (!curatedLemmas.has(nf) && !this.curatedForms.has(nf)) this.curatedForms.set(nf, normalize(e.lemma));
+      }
+    }
+  }
+
+  /**
+   * A copy that also resolves every form in the given inflection tables (all conjugations and
+   * declensions, not just forms seen in the frequency list). Lemmas and dictionary forms keep
+   * priority; a form shared by several lemmas goes to the most frequent one.
+   */
+  withTableForms(tables: Iterable<[lemma: string, forms: string[]]>): DictIndex {
+    const copy = Object.assign(Object.create(DictIndex.prototype) as DictIndex, this);
+    copy.tableForms = new Map(this.tableForms);
+    const ranked = [...tables]
+      .map(([lemma, forms]) => [this.byLemma.get(normalize(lemma)), forms] as const)
+      .filter((x): x is readonly [DictEntry, string[]] => !!x[0])
+      .sort((a, b) => (a[0].rank ?? 1e9) - (b[0].rank ?? 1e9));
+    for (const [entry, forms] of ranked) {
+      const lemma = normalize(entry.lemma);
+      for (const f of forms) {
+        const nf = normalize(f);
+        // Skip table artifacts like "¿no".
+        if (!/^\p{L}[\p{L}\p{M}'’-]*$/u.test(nf)) continue;
+        if (this.byLemma.has(nf) || this.formToLemma.has(nf) || this.curatedForms.has(nf) || copy.tableForms.has(nf)) continue;
+        copy.tableForms.set(nf, lemma);
+      }
+    }
+    return copy;
   }
 
   get size() {
@@ -45,8 +86,10 @@ export class DictIndex {
   /** Resolve a surface form (e.g. "tengo") to its normalized lemma key ("tener"). Returns the input if unknown. */
   lemmaOf(word: string): string {
     const n = normalize(word);
+    const curated = this.curatedForms.get(n);
+    if (curated) return curated;
     if (this.byLemma.has(n)) return n;
-    return this.formToLemma.get(n) ?? n;
+    return this.formToLemma.get(n) ?? this.tableForms.get(n) ?? n;
   }
 
   lookup(word: string): DictEntry | undefined {

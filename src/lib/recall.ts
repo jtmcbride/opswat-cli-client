@@ -1,8 +1,9 @@
 import type { DictIndex } from './dictionary';
+import type { ReviewCard } from './queue';
 import { normalize, tokenize } from './tokenize';
 import type { Grade, KnownWord, SentencePair } from './types';
 
-export type ExerciseKind = 'flip' | 'type' | 'cloze' | 'listen';
+export type ExerciseKind = 'flip' | 'type' | 'cloze' | 'listen' | 'speak';
 export type AnswerResult = 'exact' | 'accent' | 'typo' | 'wrong';
 
 const clean = (s: string) =>
@@ -44,6 +45,18 @@ export function checkAnswer(input: string, expected: string): AnswerResult {
   return levenshtein(fa, fb) <= allowed ? 'typo' : 'wrong';
 }
 
+const RESULT_RANK: Record<AnswerResult, number> = { exact: 0, accent: 1, typo: 2, wrong: 3 };
+
+/** Best result over several candidate answers (e.g. speech recognition alternatives). */
+export function bestAnswer(inputs: string[], expected: string): { result: AnswerResult; input: string } {
+  let best = { result: 'wrong' as AnswerResult, input: inputs[0] ?? '' };
+  for (const input of inputs) {
+    const result = checkAnswer(input, expected);
+    if (RESULT_RANK[result] < RESULT_RANK[best.result]) best = { result, input };
+  }
+  return best;
+}
+
 export const SUGGESTED_GRADE: Record<AnswerResult, Grade> = {
   exact: 'good',
   accent: 'good',
@@ -52,18 +65,25 @@ export const SUGGESTED_GRADE: Record<AnswerResult, Grade> = {
 };
 
 /**
- * Picks the exercise for a due card. New cards start with recognition (flip); once seen, recall
- * exercises take over. The choice is deterministic per card and repetition so it doesn't change
- * on re-render.
+ * Picks the exercise for a due card. Recognition cards show the word (or play it); production
+ * cards ask for the word from its meaning, a sentence blank, or by saying it. New and
+ * just-forgotten cards are flip cards first. The choice is deterministic per card and repetition
+ * so it doesn't change on re-render.
  */
 export function chooseExercise(
-  card: KnownWord,
-  opts: { style: 'flip' | 'mixed'; hasContext: boolean; canListen: boolean },
+  card: ReviewCard,
+  opts: { style: 'flip' | 'mixed'; hasContext: boolean; canListen: boolean; canSpeak?: boolean },
 ): ExerciseKind {
-  if (opts.style === 'flip' || card.srs.reps === 0 || !card.word.trim()) return 'flip';
-  const kinds: ExerciseKind[] = ['type'];
-  if (opts.hasContext) kinds.push('cloze', 'cloze');
-  if (opts.canListen) kinds.push('listen');
+  if (opts.style === 'flip' || card.srs.state !== 'review' || !card.word.word.trim()) return 'flip';
+  const kinds: ExerciseKind[] = [];
+  if (card.dir === 'recognize') {
+    kinds.push('flip', 'flip');
+    if (opts.canListen) kinds.push('listen');
+  } else {
+    kinds.push('type');
+    if (opts.hasContext) kinds.push('cloze', 'cloze');
+    if (opts.canSpeak) kinds.push('speak');
+  }
   let h = card.srs.reps * 31;
   for (const ch of card.id) h = (h * 33 + ch.charCodeAt(0)) >>> 0;
   return kinds[h % kinds.length];

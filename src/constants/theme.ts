@@ -14,6 +14,8 @@ const light = {
   success: '#1E9E5A',
   danger: '#D64545',
   unknown: '#B4552D',
+  /** Ordered one-hue ramp for low → high (validated for contrast and colour-blind separation). */
+  ramp: ['#86b6ef', '#3987e5', '#1c5cab', '#0d366b'] as string[],
 };
 
 const dark: typeof light = {
@@ -30,6 +32,7 @@ const dark: typeof light = {
   success: '#3CC27A',
   danger: '#F06767',
   unknown: '#E08A5F',
+  ramp: ['#184f95', '#2a78d6', '#6da7ec', '#b7d3f6'],
 };
 
 export type Theme = typeof light;

@@ -7,14 +7,33 @@ import { createReadStream, existsSync, readFileSync, writeFileSync } from 'node:
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 
-import { parseRawDictionary } from '../../src/data/format';
+import { parseRawDictionary, type RawDictionary } from '../../src/data/format';
 import de from '../../src/data/dictionaries/de';
 import es from '../../src/data/dictionaries/es';
 import fr from '../../src/data/dictionaries/fr';
+import hr from '../../src/data/dictionaries/hr';
 import it from '../../src/data/dictionaries/it';
 import pt from '../../src/data/dictionaries/pt';
 import { DictIndex } from '../../src/lib/dictionary';
-import { parseFrequencyList, rankLemmas, selectSentences, toGenerated, WikiIndex, type Candidate } from './lib';
+import {
+  cleanSerboCroatian,
+  parseFrequencyList,
+  rankLemmas,
+  selectSentences,
+  toGenerated,
+  toInflections,
+  WikiIndex,
+  type Candidate,
+  type WikiEntry,
+} from './lib';
+
+interface LangConfig {
+  /** Tatoeba language code. */
+  iso3: string;
+  starter: RawDictionary;
+  /** Adjusts or drops (null) Wiktionary entries before indexing. */
+  prepare?: (entry: WikiEntry) => WikiEntry | null;
+}
 
 const LANGS = {
   es: { iso3: 'spa', starter: es },
@@ -22,7 +41,8 @@ const LANGS = {
   de: { iso3: 'deu', starter: de },
   it: { iso3: 'ita', starter: it },
   pt: { iso3: 'por', starter: pt },
-} as const;
+  hr: { iso3: 'hrv', starter: hr, prepare: cleanSerboCroatian },
+} satisfies Record<string, LangConfig>;
 type Lang = keyof typeof LANGS;
 
 const WORDS = 5000;
@@ -52,6 +72,7 @@ async function main() {
 
   // Dictionaries first: sentence selection needs them.
   const indexes = new Map<Lang, { index: DictIndex; entries: ReturnType<typeof rankLemmas> }>();
+  const inflections = new Map<Lang, ReturnType<typeof toInflections>>();
   for (const lang of langs) {
     const wikiPath = join(src, 'wiktionary', `${lang}.jsonl`);
     const freqPath = join(src, 'freq', `${lang}.txt`);
@@ -64,7 +85,11 @@ async function main() {
     for await (const line of lines(wikiPath)) {
       if (!line) continue;
       try {
-        wiki.add(JSON.parse(line));
+        const raw = JSON.parse(line) as WikiEntry;
+        const { prepare } = LANGS[lang] as LangConfig;
+        const entry = prepare ? prepare(raw) : raw;
+        if (!entry) continue;
+        wiki.add(entry);
         n++;
       } catch {
         // Skip malformed lines.
@@ -75,6 +100,7 @@ async function main() {
     const starter = parseRawDictionary(LANGS[lang].starter).entries.map(({ rank: _rank, ...e }) => e);
     const index = new DictIndex([entries, starter]);
     indexes.set(lang, { index, entries });
+    inflections.set(lang, toInflections(lang, entries, wiki));
     console.log(`[${lang}] ${n} wiktionary entries, ${wiki.lemmas.size} lemmas, kept ${entries.length}`);
   }
 
@@ -116,6 +142,9 @@ async function main() {
     const sentences = selectSentences(pool, index);
     const data = toGenerated(lang, entries, sentences, SOURCES);
     writeFileSync(join(out, `${lang}.json`), JSON.stringify(data));
+    const infl = inflections.get(lang)!;
+    writeFileSync(join(out, `${lang}-forms.json`), JSON.stringify(infl));
+    console.log(`[${lang}] inflection tables for ${Object.keys(infl.lemmas).length} words, ${infl.tags.length} tag sets`);
     console.log(`[${lang}] ${pool.length} paired sentences -> ${sentences.length} selected; wrote ${lang}.json`);
   }
 }

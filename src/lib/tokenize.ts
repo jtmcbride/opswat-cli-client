@@ -32,3 +32,6 @@ export function splitElision(norm: string): string[] {
   const m = /^(\p{L}+')(\p{L}.*)$/u.exec(norm);
   return m ? [m[1], m[2]] : [norm];
 }
+
+/** Stable identity of a known word across devices and edits of its id: "es:casa". */
+export const wordKey = (lang: string, word: string) => `${lang}:${normalize(word)}`;
