@@ -40,8 +40,8 @@ export function SpeakButton({
       hitSlop={10}
       onPress={() => (active ? stopSpeaking() : speak(text, lang, { id: key, rate: rate ?? defaultRate }))}
       onLongPress={() => speak(text, lang, { id: key, rate: 'slow' })}
-      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, padding: 2, flexDirection: 'row', alignItems: 'center', gap: 2 })}>
-      <Ionicons name={active ? 'volume-high' : 'volume-medium-outline'} size={size} color={active ? t.primary : t.textMuted} />
+      style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, minWidth: 44, minHeight: 44, justifyContent: 'center', padding: 4, flexDirection: 'row', alignItems: 'center', gap: 2 })}>
+      <Ionicons accessible={false} aria-hidden name={active ? 'volume-high' : 'volume-medium-outline'} size={size} color={active ? t.primary : t.textMuted} />
       {rate === 'slow' && <Text style={{ color: active ? t.primary : t.textMuted, fontSize: 13 }}>slow</Text>}
     </Pressable>
   );

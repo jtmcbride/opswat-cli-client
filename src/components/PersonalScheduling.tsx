@@ -45,7 +45,7 @@ export function PersonalScheduling() {
       ) : (
         <T variant="muted">
           {data.reviews < MIN_FIT_REVIEWS
-            ? `After ${MIN_FIT_REVIEWS - data.reviews} more reviews (${data.reviews} so far), Lingo can tune review timing to how your memory works.`
+            ? `After ${MIN_FIT_REVIEWS - data.reviews} more reviews (${data.reviews} so far), Leximble can tune review timing to how your memory works.`
             : `You have ${data.reviews} reviews: enough to tune review timing to how your memory works.`}
         </T>
       )}

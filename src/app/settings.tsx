@@ -67,7 +67,7 @@ export default function SettingsScreen() {
       reviewLog: s.reviewLog,
       dictEntries,
     };
-    await shareText(`lingo-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup));
+    await shareText(`leximble-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup));
   };
 
   const importBackup = async () => {
@@ -75,7 +75,7 @@ export default function SettingsScreen() {
     if (!file) return;
     try {
       const data = JSON.parse(file.text) as Backup;
-      if (data.version !== 1 || !Array.isArray(data.words)) throw new Error('Not a Lingo backup file');
+      if (data.version !== 1 || !Array.isArray(data.words)) throw new Error('Not a Leximble backup file');
       confirm(`Replace all current data with ${data.words.length} words from the backup?`, () => {
         restore(data);
         setMessage('Backup restored.');
@@ -105,7 +105,7 @@ export default function SettingsScreen() {
           </Link>
         </Row>
         <T variant="small">Your native language (used for meanings and AI translations)</T>
-        <Input value={native} onChangeText={setNative} onBlur={() => setSettings({ nativeLang: native.trim() || 'English' })} />
+        <Input accessibilityLabel="Native language" value={native} onChangeText={setNative} onBlur={() => setSettings({ nativeLang: native.trim() || 'English' })} />
         <Link href="/dictionaries" asChild>
           <Button variant="secondary" icon="book" title="Manage dictionaries" />
         </Link>
@@ -256,7 +256,7 @@ export default function SettingsScreen() {
           </Row>
         ) : (
           <>
-            <Input placeholder="sk-ant-…" value={keyDraft} onChangeText={setKeyDraft} secureTextEntry />
+            <Input accessibilityLabel="Anthropic API key" placeholder="sk-ant-…" value={keyDraft} onChangeText={setKeyDraft} secureTextEntry />
             <Button
               title="Save key"
               disabled={!keyDraft.trim()}
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
           </>
         )}
         <T variant="small">Model</T>
-        <Input value={model} onChangeText={setModel} onBlur={() => setSettings({ aiModel: model.trim() || DEFAULT_MODEL })} />
+        <Input accessibilityLabel="AI model" value={model} onChangeText={setModel} onBlur={() => setSettings({ aiModel: model.trim() || DEFAULT_MODEL })} />
       </Card>
 
       <Card>

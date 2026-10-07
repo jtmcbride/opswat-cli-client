@@ -83,10 +83,10 @@ export default function EditWordScreen() {
           <T variant="small">Word</T>
           <SpeakButton text={text} lang={word.lang} />
         </Row>
-        <Input value={text} onChangeText={setText} />
+        <Input accessibilityLabel="Word" value={text} onChangeText={setText} />
         <SayIt target={word.word} lang={word.lang} compact />
         <T variant="small">Meaning</T>
-        <Input value={gloss} onChangeText={setGloss} />
+        <Input accessibilityLabel="Meaning" value={gloss} onChangeText={setGloss} />
         <CardStats label="Recognition (word → meaning)" srs={word.srs} />
         <CardStats label="Production (meaning → word)" srs={word.produce} />
         {(isLeech(word.srs) || (word.produce && isLeech(word.produce))) && (
@@ -94,7 +94,7 @@ export default function EditWordScreen() {
         )}
         <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
           <T style={{ flex: 1 }}>Suspended (skip in reviews)</T>
-          <Switch value={!!word.suspended} onValueChange={(v) => updateWord(word.id, { suspended: v })} />
+          <Switch accessibilityLabel="Suspend this word" value={!!word.suspended} onValueChange={(v) => updateWord(word.id, { suspended: v })} />
         </Row>
       </Card>
       <Row>

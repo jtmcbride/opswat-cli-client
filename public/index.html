@@ -5,12 +5,20 @@
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
     <title>%WEB_TITLE%</title>
+    <meta name="description" content="Leximble helps you build a vocabulary that stays with you. Learn in context, practice daily, and review at your own pace." />
     <!-- Expo's default full-height reset, using dynamic viewport units where supported so the
          bottom tab bar isn't hidden behind mobile browser toolbars. -->
     <style id="expo-reset">
       html,
       body {
         height: 100%;
+      }
+      :focus-visible {
+        outline: 3px solid #245BD6;
+        outline-offset: 3px;
+      }
+      @media (prefers-color-scheme: dark) {
+        :focus-visible { outline-color: #A0BEFF; }
       }
       body {
         overflow: hidden;

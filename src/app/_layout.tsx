@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Pressable, useColorScheme, View } from 'react-native';
 
+import { Brand } from '@/components/Brand';
 import { useTheme } from '@/constants/theme';
 import { startCloudSync } from '@/store/cloud';
 import { startReminderSync } from '@/store/reminders';
@@ -41,8 +42,9 @@ export default function RootLayout() {
 
   if (!hydrated) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: t.bg }}>
-        <ActivityIndicator />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24, backgroundColor: t.bg }}>
+        <Brand />
+        <ActivityIndicator color={t.primary} accessibilityLabel="Loading Leximble" />
       </View>
     );
   }
