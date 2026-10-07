@@ -19,6 +19,9 @@ import { languageName, useStore } from '@/store/useStore';
 
 type Mode = 'choice' | 'reveal';
 
+/** An exercise the learner has already moved past in this session. */
+type Past = { exercise: Exercise; target: DictEntry };
+
 export default function LearnScreen() {
   const lang = useStore((s) => s.settings.activeLang);
   // Remount per language so per-exercise state resets.
@@ -44,6 +47,10 @@ function LearnSession({ lang }: { lang: string }) {
   const [peek, setPeek] = useState<{ word: string; gloss?: string } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Exercises already left this session, oldest first; `viewing` is the one being revisited.
+  const [history, setHistory] = useState<Past[]>([]);
+  const [viewing, setViewing] = useState<number | null>(null);
+  const [showList, setShowList] = useState(false);
 
   // Recomputed only when the inputs change: moving on (round), adding a word, or new sentences.
   const exercise: Exercise | null | undefined = useMemo(() => {
@@ -58,21 +65,24 @@ function LearnSession({ lang }: { lang: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, sentences, lemmas, round]);
 
-  const next = () => {
-    if (exercise) markSentenceSeen(lang, exercise.sentenceIndex);
-    setRound((r) => r + 1);
-    setAnswered(null);
-    setRevealed(false);
-    setPeek(null);
-    setError(null);
-  };
-
   const target: DictEntry | null = useMemo(() => {
     if (!exercise || !index) return null;
     const entry = index.get(exercise.target);
     const gloss = exercise.sentence.glosses?.[exercise.target] ?? entry?.gloss ?? '?';
     return entry ? { ...entry, gloss } : { lemma: exercise.target, gloss };
   }, [exercise, index]);
+
+  const next = () => {
+    if (exercise && target) {
+      markSentenceSeen(lang, exercise.sentenceIndex);
+      setHistory((h) => [...h, { exercise, target }]);
+    }
+    setRound((r) => r + 1);
+    setAnswered(null);
+    setRevealed(false);
+    setPeek(null);
+    setError(null);
+  };
 
   const options = useMemo(() => {
     if (!target || !index) return [];
@@ -119,9 +129,127 @@ function LearnSession({ lang }: { lang: string }) {
     );
   }
 
+  if (showList || viewing !== null) {
+    const item = viewing !== null ? history[viewing] : null;
+    return (
+      <Screen>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <Button
+            compact
+            variant="ghost"
+            icon="arrow-back"
+            title={exercise ? 'Back to current' : 'Back'}
+            onPress={() => {
+              setViewing(null);
+              setShowList(false);
+              setPeek(null);
+            }}
+          />
+          {item ? (
+            <Button compact variant="ghost" icon="list" title="All" onPress={() => { setViewing(null); setShowList(true); setPeek(null); }} />
+          ) : (
+            <T variant="muted">{history.length} this session</T>
+          )}
+        </Row>
+
+        {item && viewing !== null ? (
+          <>
+            <T variant="muted">
+              Sentence {viewing + 1} of {history.length}
+            </T>
+            <Card style={{ gap: space.lg }}>
+              <Sentence
+                text={item.exercise.sentence.text}
+                index={index}
+                known={lemmas}
+                target={item.exercise.target}
+                onWordPress={(word, ls) => setPeek({ word, gloss: glossFor(index, word, ls, item.exercise.sentence.glosses) })}
+              />
+              <Row>
+                <SpeakButton text={item.exercise.sentence.text} lang={lang} id={`sentence:${item.exercise.sentenceIndex}`} />
+                <SpeakButton text={item.exercise.sentence.text} lang={lang} rate="slow" id={`sentence-slow:${item.exercise.sentenceIndex}`} />
+              </Row>
+              {peek && (
+                <Pressable onPress={() => setPeek(null)} style={[styles.peek, { backgroundColor: t.surfaceAlt }]}>
+                  <T style={{ fontWeight: '600' }}>{peek.word}</T>
+                  <T variant="muted" style={{ flex: 1 }}>
+                    {peek.gloss ?? 'Not in dictionary'}
+                  </T>
+                  <SpeakButton text={peek.word} lang={lang} size={20} />
+                </Pressable>
+              )}
+              <T variant="muted">“{item.exercise.sentence.translation}”</T>
+              <SayIt target={item.exercise.sentence.text} lang={lang} />
+            </Card>
+            <Card>
+              <T variant="heading">
+                {withArticle(lang, item.target.lemma, item.target.gender)} — {item.target.gloss}
+              </T>
+              {lemmas.has(normalize(item.target.lemma)) ? (
+                <T variant="small">In your words</T>
+              ) : (
+                <Button
+                  title="Add to my words"
+                  icon="add"
+                  onPress={() => addWord(lang, item.target.lemma, item.target.gloss, item.exercise.sentence)}
+                />
+              )}
+            </Card>
+            <Row>
+              <Button
+                variant="secondary"
+                icon="chevron-back"
+                title="Previous"
+                disabled={viewing === 0}
+                onPress={() => { setViewing(viewing - 1); setPeek(null); }}
+                style={{ flex: 1 }}
+              />
+              <Button
+                variant="secondary"
+                title={viewing === history.length - 1 ? (exercise ? 'Current' : 'Done') : 'Next'}
+                onPress={() => {
+                  setPeek(null);
+                  if (viewing === history.length - 1) setViewing(null);
+                  else setViewing(viewing + 1);
+                }}
+                style={{ flex: 1 }}
+              />
+            </Row>
+          </>
+        ) : (
+          <View style={{ gap: space.sm }}>
+            {history.map((h, i) => (
+              <Pressable
+                key={i}
+                onPress={() => { setShowList(false); setViewing(i); setPeek(null); }}
+                style={[styles.listItem, { backgroundColor: t.surface, borderColor: t.border }]}>
+                <T>{h.exercise.sentence.text}</T>
+                <T variant="small">{h.exercise.sentence.translation}</T>
+                <T variant="small">
+                  {h.target.lemma} — {h.target.gloss}
+                </T>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </Screen>
+    );
+  }
+
+  const historyButton = history.length > 0 && (
+    <Button
+      compact
+      variant="ghost"
+      icon="time-outline"
+      title={`History (${history.length})`}
+      onPress={() => setViewing(history.length - 1)}
+    />
+  );
+
   if (!exercise || !target) {
     return (
       <Screen>
+        {historyButton}
         <Empty
           icon="sparkles-outline"
           title="No new sentences right now"
@@ -165,6 +293,7 @@ function LearnSession({ lang }: { lang: string }) {
 
   return (
     <Screen>
+      {historyButton}
       <Row style={{ justifyContent: 'space-between' }}>
         <T variant="muted">Guess the highlighted word</T>
         <Row>
@@ -259,5 +388,6 @@ function LearnSession({ lang }: { lang: string }) {
 }
 
 const styles = StyleSheet.create({
+  listItem: { gap: space.xs, padding: space.md, borderRadius: radius.md, borderWidth: StyleSheet.hairlineWidth },
   peek: { flexDirection: 'row', gap: space.sm, padding: space.md, borderRadius: radius.md },
 });
