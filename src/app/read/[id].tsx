@@ -8,6 +8,7 @@ import { ExplainButton } from '@/components/ExplainButton';
 import { SayIt } from '@/components/SayIt';
 import { glossFor, Sentence } from '@/components/Sentence';
 import { SpeakButton } from '@/components/SpeakButton';
+import { PLAYER_BAR_SPACE, Transcript } from '@/components/Transcript';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { radius, space, useTheme } from '@/constants/theme';
 import { useApiKey } from '@/hooks/useApiKey';
@@ -105,69 +106,92 @@ export default function ReaderScreen() {
     } else doIt();
   };
 
+  const segments = text.segments;
+
+  const header = (
+    <>
+      <T variant="title">{text.title}</T>
+      {stats && (
+        <View style={{ gap: space.xs }}>
+          <CoverageBar ratio={stats.ratio} />
+          <T variant="small">
+            {stats.total} words · {stats.unknown.length} new · tap any word for its meaning
+          </T>
+        </View>
+      )}
+    </>
+  );
+
+  const footer = (
+    <>
+      {stats && stats.unknown.length > 0 && (
+        <Card>
+          <T variant="heading">New words in this text</T>
+          {stats.unknown.slice(0, 40).map(({ lemma, count }) => {
+            const gloss = glossOf(lemma);
+            return (
+              <Row key={lemma} style={{ flexWrap: 'nowrap' }}>
+                <View style={{ flex: 1 }}>
+                  <T style={{ fontWeight: '600' }}>
+                    {withGender(lemma)} <T variant="small">×{count}</T>
+                  </T>
+                  <T variant="muted" numberOfLines={1}>
+                    {gloss ?? 'Tap the word in the text to look it up'}
+                  </T>
+                </View>
+                {gloss && (
+                  <Button compact variant="secondary" title="Add" onPress={() => addWord(lang, displayLemma(lemma), gloss)} />
+                )}
+              </Row>
+            );
+          })}
+        </Card>
+      )}
+      <Button variant="ghost" title="Delete text" onPress={remove} />
+      {/* Room for the peek bar. */}
+      {peek && <View style={{ height: 120 }} />}
+    </>
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <Stack.Screen options={{ title: text.title }} />
-      <Screen edges={['bottom']}>
-        <T variant="title">{text.title}</T>
-        {stats && (
-          <View style={{ gap: space.xs }}>
-            <CoverageBar ratio={stats.ratio} />
-            <T variant="small">
-              {stats.total} words · {stats.unknown.length} new · tap any word for its meaning
-            </T>
-          </View>
-        )}
-
-        {index &&
-          paragraphs.map((sentences, pi) => (
-            <Row key={pi} style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
-              <Text style={{ flex: 1, color: t.text, fontSize: 19, lineHeight: 30 }}>
-                {sentences.map((s, si) => (
-                  <Sentence
-                    key={si}
-                    text={s}
-                    index={index}
-                    known={lemmas}
-                    style={{ fontSize: 19, lineHeight: 30 }}
-                    onWordPress={(surface, ls) => onWord(surface, ls, s)}
-                  />
-                ))}
-              </Text>
-              <SpeakButton text={sentences.join('')} lang={lang} size={20} id={`para:${text.id}:${pi}`} />
-            </Row>
-          ))}
-
-        {stats && stats.unknown.length > 0 && (
-          <Card>
-            <T variant="heading">New words in this text</T>
-            {stats.unknown.slice(0, 40).map(({ lemma, count }) => {
-              const gloss = glossOf(lemma);
-              return (
-                <Row key={lemma} style={{ flexWrap: 'nowrap' }}>
-                  <View style={{ flex: 1 }}>
-                    <T style={{ fontWeight: '600' }}>
-                      {withGender(lemma)} <T variant="small">×{count}</T>
-                    </T>
-                    <T variant="muted" numberOfLines={1}>
-                      {gloss ?? 'Tap the word in the text to look it up'}
-                    </T>
-                  </View>
-                  {gloss && (
-                    <Button compact variant="secondary" title="Add" onPress={() => addWord(lang, displayLemma(lemma), gloss)} />
-                  )}
-                </Row>
-              );
-            })}
-          </Card>
-        )}
-        <Button variant="ghost" title="Delete text" onPress={remove} />
-        {/* Room for the peek bar. */}
-        {peek && <View style={{ height: 120 }} />}
-      </Screen>
+      {segments && index ? (
+        <Transcript text={{ ...text, segments }} index={index} known={lemmas} onWord={onWord} header={header} footer={footer} />
+      ) : (
+        <Screen edges={['bottom']}>
+          {header}
+          {index &&
+            paragraphs.map((sentences, pi) => (
+              <Row key={pi} style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
+                <Text style={{ flex: 1, color: t.text, fontSize: 19, lineHeight: 30 }}>
+                  {sentences.map((s, si) => (
+                    <Sentence
+                      key={si}
+                      text={s}
+                      index={index}
+                      known={lemmas}
+                      style={{ fontSize: 19, lineHeight: 30 }}
+                      onWordPress={(surface, ls) => onWord(surface, ls, s)}
+                    />
+                  ))}
+                </Text>
+                <SpeakButton text={sentences.join('')} lang={lang} size={20} id={`para:${text.id}:${pi}`} />
+              </Row>
+            ))}
+          {footer}
+        </Screen>
+      )}
 
       {peek && (
-        <Pressable onPress={() => setPeek(null)} style={[styles.peek, { backgroundColor: t.surface, borderColor: t.border }]}>
+        <Pressable
+          onPress={() => setPeek(null)}
+          style={[
+            styles.peek,
+            { backgroundColor: t.surface, borderColor: t.border },
+            // Sit above the audio player bar.
+            segments && text.audioName ? { bottom: PLAYER_BAR_SPACE } : null,
+          ]}>
           <Row style={{ flexWrap: 'nowrap' }}>
             <View style={{ flex: 1 }}>
               <T style={{ fontWeight: '600' }}>

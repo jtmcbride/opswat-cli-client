@@ -74,10 +74,21 @@ export interface ReadingText {
   lang: LangCode;
   title: string;
   body: string;
-  source: 'user' | 'ai';
+  source: 'user' | 'ai' | 'audio';
   createdAt: number;
   /** Meanings for words the dictionary lacks (from AI generation or lookups), keyed by lowercase word. */
   glosses?: Record<string, string>;
+  /** Timed transcript lines, for texts transcribed from audio. */
+  segments?: AudioSegment[];
+  /** Original audio file name. The audio itself stays on the device that imported it (see lib/audioStore). */
+  audioName?: string;
+}
+
+export interface AudioSegment {
+  /** Seconds from the start of the audio. */
+  start: number;
+  end: number;
+  text: string;
 }
 
 export interface UserDictMeta {

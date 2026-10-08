@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { BUILTIN_LANGUAGES } from '@/data';
 import { dayKey, record, type ActivityLog } from '@/lib/activity';
 import { DEFAULT_MODEL, type ChatTurn } from '@/lib/ai';
+import { deleteAudio } from '@/lib/audioStore';
 import { GRADE_VALUE, knownSrs, migrateSrs, newSrs, schedule } from '@/lib/srs';
 import { normalize, wordKey } from '@/lib/tokenize';
 import type {
@@ -59,7 +60,7 @@ export interface AppState {
   markSentenceSeen: (lang: LangCode, key: number) => void;
   addExtraSentences: (lang: LangCode, sentences: SentencePair[]) => void;
   setChat: (lang: LangCode, turns: ChatTurn[], scenario?: string | null) => void;
-  addText: (text: Omit<ReadingText, 'id' | 'createdAt'>) => ReadingText;
+  addText: (text: Omit<ReadingText, 'id' | 'createdAt'> & { id?: string }) => ReadingText;
   addTextGlosses: (id: string, glosses: Record<string, string>) => void;
   removeText: (id: string) => void;
   restore: (backup: Backup) => void;
@@ -82,7 +83,7 @@ const migrateWords = (words: KnownWord[]) =>
 const splitDirections = (words: KnownWord[]) =>
   words.map((w) => (w.srs.state === 'review' && w.srs.reps >= 2 && !w.produce ? { ...w, produce: { ...w.srs } } : w));
 
-const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+export const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 
 export const useStore = create<AppState>()(
   persist(
@@ -226,7 +227,7 @@ export const useStore = create<AppState>()(
         })),
 
       addText: (text) => {
-        const t: ReadingText = { ...text, id: uid(), createdAt: Date.now() };
+        const t: ReadingText = { ...text, id: text.id ?? uid(), createdAt: Date.now() };
         set((s) => ({ texts: [t, ...s.texts] }));
         return t;
       },
@@ -236,7 +237,10 @@ export const useStore = create<AppState>()(
           texts: s.texts.map((t) => (t.id === id ? { ...t, glosses: { ...t.glosses, ...glosses } } : t)),
         })),
 
-      removeText: (id) => set((s) => ({ texts: s.texts.filter((t) => t.id !== id) })),
+      removeText: (id) => {
+        void deleteAudio(id);
+        set((s) => ({ texts: s.texts.filter((t) => t.id !== id) }));
+      },
 
       markCelebrated: (lang, ids) =>
         set((s) => ({ celebrated: { ...s.celebrated, [lang]: [...new Set([...(s.celebrated[lang] ?? []), ...ids])] } })),

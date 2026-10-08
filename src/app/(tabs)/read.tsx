@@ -33,12 +33,19 @@ export default function ReadScreen() {
           onPress={() => router.push({ pathname: '/read/new', params: { mode: 'ai' } })}
           style={{ flex: 1 }}
         />
+        <Button
+          title="Audio"
+          icon="mic"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/read/new', params: { mode: 'audio' } })}
+          style={{ flex: 1 }}
+        />
       </Row>
       {texts.length === 0 ? (
         <Empty
           icon="book-outline"
           title="Read real texts"
-          body="Paste an article, song lyrics, or a story, or have AI write one with your words. You'll see how much you can read and can tap any word for its meaning."
+          body="Paste an article, song lyrics, or a story, have AI write one with your words, or transcribe a podcast episode. You'll see how much you can read and can tap any word for its meaning."
         />
       ) : (
         texts.map((x) => {
@@ -56,6 +63,7 @@ export default function ReadScreen() {
                     </T>
                   </View>
                   {x.source === 'ai' && <Ionicons name="sparkles" size={16} color={t.textMuted} />}
+                  {x.source === 'audio' && <Ionicons name="headset" size={16} color={t.textMuted} />}
                 </Row>
                 {c && (
                   <>
