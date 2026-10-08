@@ -27,7 +27,8 @@ The Leximble interface uses a mobile bottom bar, desktop sidebar, guided startin
   share of it you can read, tap any word for its meaning or audio, and add new words from it.
 - **Podcasts** (optional): transcribe an audio file, a podcast episode from its RSS feed, or an
   audio link, then read along while it plays, with the current line highlighted and followed.
-  Long MP3 episodes are split and transcribed in parts. Uses your own OpenAI API key.
+  Long MP3 episodes are split and transcribed in parts. Uses your own OpenAI API key, or runs
+  Whisper on the device (web app).
 - **Chat** (optional): an AI conversation partner that writes mostly with your known words and
   introduces one or two new ones per reply. Free conversation or role-plays (café, directions,
   hotel…); your mistakes are corrected and can be saved as flashcards. Dictate by voice and have
@@ -69,10 +70,19 @@ in Settings.
 
 ## Podcast transcription (optional)
 
-Paste an [OpenAI API key](https://platform.openai.com/api-keys) in **Settings → Audio
-transcription**. Audio is sent to OpenAI's Whisper API, billed to that key (about $0.36 per hour of
-audio at the time of writing). The audio itself stays on the device that imported it; transcripts
-sync, and episodes imported from a link can be downloaded again on other devices.
+Choose an engine in **Settings → Audio transcription**:
+
+- **OpenAI**: paste an [OpenAI API key](https://platform.openai.com/api-keys). Audio is sent to
+  OpenAI's Whisper API, billed to that key (about $0.36 per hour of audio at the time of writing).
+- **On this device** (web app): Whisper runs in the browser via
+  [transformers.js](https://github.com/huggingface/transformers.js), loaded from jsDelivr on first
+  use; nothing is uploaded and it's free. The model (Fast ≈ whisper-base, Accurate ≈ whisper-small)
+  downloads once from Hugging Face and stays in the browser's cache. Browsers with WebGPU are
+  much faster; without it, transcription can take longer than the audio. Native apps don't have
+  this yet.
+
+The audio itself stays on the device that imported it; transcripts sync, and episodes imported
+from a link can be downloaded again on other devices.
 
 The iOS and Android apps load feeds and episodes directly. Browsers block most podcast hosts, so
 the web build needs a small proxy: deploy the Cloudflare Worker in [`proxy/`](proxy/README.md) and

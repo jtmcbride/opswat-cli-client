@@ -155,4 +155,8 @@ export interface Settings {
   fsrsWeights: number[] | null;
   /** Reviews the fitted weights were trained on, and how much they improved predictions. */
   fsrsFit: { reviews: number; improvement: number; at: number } | null;
+  /** How audio is transcribed: OpenAI's API, or a Whisper model running on this device. */
+  transcriptionEngine: 'openai' | 'local';
+  /** On-device model; null = the recommended one for this device. */
+  localModel: 'fast' | 'accurate' | null;
 }

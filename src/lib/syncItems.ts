@@ -50,9 +50,14 @@ interface Kind {
   apply(s: Synced, upserts: Map<string, unknown>, deletes: Set<string>): Partial<Synced>;
 }
 
-/** Settings that only make sense on the device that set them. */
-type DeviceSettings = 'reminder';
-const deviceOnly = ({ reminder: _, ...rest }: Settings): Omit<Settings, DeviceSettings> => rest;
+/** Settings that only make sense on the device that set them (a laptop and a phone transcribe differently). */
+type DeviceSettings = 'reminder' | 'transcriptionEngine' | 'localModel';
+const deviceOnly = ({
+  reminder: _r,
+  transcriptionEngine: _e,
+  localModel: _m,
+  ...rest
+}: Settings): Omit<Settings, DeviceSettings> => rest;
 
 const wordKey = (w: KnownWord) => keyOf(w.lang, w.word);
 const podcastKey = (p: SavedPodcast) => `${p.lang}:${p.url}`;
@@ -129,7 +134,17 @@ const KINDS: Record<string, Kind> = {
     slices: ['settings'],
     items: (s) => [{ key: '', value: deviceOnly(s.settings), refs: [s.settings] }],
     apply: (s, up) =>
-      up.has('') ? { settings: { ...s.settings, ...(up.get('') as Partial<Settings>), reminder: s.settings.reminder } } : {},
+      up.has('')
+        ? {
+            settings: {
+              ...s.settings,
+              ...(up.get('') as Partial<Settings>),
+              reminder: s.settings.reminder,
+              transcriptionEngine: s.settings.transcriptionEngine,
+              localModel: s.settings.localModel,
+            },
+          }
+        : {},
   },
   lang: {
     slices: ['customLanguages'],

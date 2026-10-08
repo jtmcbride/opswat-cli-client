@@ -40,6 +40,8 @@ const settings: Settings = {
   chatAutoSpeak: false,
   fsrsWeights: null,
   fsrsFit: null,
+  transcriptionEngine: 'openai',
+  localModel: null,
 };
 
 const empty = (): Synced => ({

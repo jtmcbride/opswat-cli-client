@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { PodcastPicker } from '@/components/PodcastPicker';
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
@@ -10,6 +10,8 @@ import { saveAudio } from '@/lib/audioStore';
 import { pickAudioFile, pickTextFile } from '@/lib/files';
 import type { AudioInput } from '@/lib/transcribe';
 import { MAX_EPISODE_BYTES, transcribeLong } from '@/lib/transcribeLong';
+import { transcribeLocal } from '@/lib/localTranscribe';
+import { useLocalModel } from '@/hooks/useLocalModel';
 import { languageName, uid, useStore } from '@/store/useStore';
 
 export default function NewTextScreen() {
@@ -36,6 +38,10 @@ export default function NewTextScreen() {
   const [audioSource, setAudioSource] = useState<'file' | 'link'>('file');
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
   const [progress, setProgress] = useState<string | null>(null);
+  const engine = settings.transcriptionEngine;
+  const local = useLocalModel();
+  const onDevice = engine === 'local' && !!local.support?.supported;
+  const cancelRef = useRef<AbortController | null>(null);
 
   const open = (id: string) => router.replace({ pathname: '/read/[id]', params: { id } });
 
@@ -91,11 +97,21 @@ export default function NewTextScreen() {
   };
 
   const transcribe = async () => {
-    if (!openAiKey || !audio) return;
+    if (!audio || (!onDevice && !openAiKey)) return;
     setBusy(true);
     setError(null);
+    const controller = new AbortController();
+    cancelRef.current = controller;
     try {
-      const segments = await transcribeLong({ apiKey: openAiKey, audio, lang, onProgress: setProgress });
+      const segments = onDevice
+        ? await transcribeLocal({
+            audio,
+            lang,
+            model: local.model,
+            signal: controller.signal,
+            onProgress: (message, fraction) => setProgress(fraction != null ? `${message} ${Math.round(fraction * 100)}%` : message),
+          })
+        : await transcribeLong({ apiKey: openAiKey!, audio, lang, onProgress: setProgress });
       const id = uid();
       let audioName: string | undefined = audio.name;
       try {
@@ -116,8 +132,9 @@ export default function NewTextScreen() {
       });
       open(text.id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if ((e as Error).name !== 'AbortError') setError(e instanceof Error ? e.message : String(e));
     } finally {
+      cancelRef.current = null;
       setBusy(false);
       setProgress(null);
     }
@@ -134,11 +151,13 @@ export default function NewTextScreen() {
       </Row>
 
       {mode === 'audio' ? (
-        openAiKey ? (
+        openAiKey || onDevice ? (
           <Card>
             <T variant="muted">
-              Transcribe a {languageName(lang, custom)} podcast episode or other recording, then read along while it plays.
-              Long MP3 episodes are transcribed in parts. Transcription is billed to your OpenAI account.
+              Transcribe a podcast episode or other recording in {languageName(lang, custom)}, then read along while it plays.
+              {onDevice
+                ? ' Transcribed on this device, for free; keep this page open until it finishes.'
+                : ' Long MP3 episodes are transcribed in parts. Transcription is billed to your OpenAI account.'}
             </T>
             <Row>
               <Chip label="File" selected={audioSource === 'file'} onPress={() => setAudioSource('file')} />
@@ -166,11 +185,14 @@ export default function NewTextScreen() {
             )}
             <Button title="Transcribe" icon="mic" onPress={transcribe} loading={busy} disabled={!audio || tooBig} />
             {busy && progress && <T variant="small">{progress} This can take a few minutes for a long episode.</T>}
+            {busy && onDevice && <Button variant="ghost" title="Cancel" onPress={() => cancelRef.current?.abort()} />}
             {error && <T style={{ color: t.danger }}>{error}</T>}
           </Card>
         ) : (
           <Card>
-            <T variant="muted">Transcribing audio needs an OpenAI API key.</T>
+            <T variant="muted">
+              Transcribing audio needs an OpenAI API key{local.support?.supported ? ', or switch to on-device transcription' : ''}.
+            </T>
             <Button title="Open Settings" onPress={() => router.push('/settings')} />
           </Card>
         )

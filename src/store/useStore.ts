@@ -111,6 +111,8 @@ export const useStore = create<AppState>()(
         chatAutoSpeak: false,
         fsrsWeights: null,
         fsrsFit: null,
+        transcriptionEngine: 'openai',
+        localModel: null,
       },
       customLanguages: [],
       words: [],

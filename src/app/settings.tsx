@@ -4,10 +4,11 @@ import { Switch } from 'react-native';
 
 import { PersonalScheduling } from '@/components/PersonalScheduling';
 import { SpeakButton } from '@/components/SpeakButton';
+import { TranscriptionSettings } from '@/components/TranscriptionSettings';
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
 import { useTheme } from '@/constants/theme';
 import { starterDictionary } from '@/data';
-import { useApiKey, useOpenAiKey } from '@/hooks/useApiKey';
+import { useApiKey } from '@/hooks/useApiKey';
 import { useCanSpeak } from '@/hooks/useSpeech';
 import { DEFAULT_MODEL } from '@/lib/ai';
 import { confirm } from '@/lib/confirm';
@@ -35,8 +36,6 @@ export default function SettingsScreen() {
   const restore = useStore((s) => s.restore);
   const [apiKey, saveApiKey] = useApiKey();
   const [keyDraft, setKeyDraft] = useState('');
-  const [openAiKey, saveOpenAiKey] = useOpenAiKey();
-  const [openAiDraft, setOpenAiDraft] = useState('');
   const [native, setNative] = useState(settings.nativeLang);
   const [model, setModel] = useState(settings.aiModel);
   const [message, setMessage] = useState<string | null>(null);
@@ -274,37 +273,7 @@ export default function SettingsScreen() {
         <Input accessibilityLabel="AI model" value={model} onChangeText={setModel} onBlur={() => setSettings({ aiModel: model.trim() || DEFAULT_MODEL })} />
       </Card>
 
-      <Card>
-        <T variant="heading">Audio transcription</T>
-        <T variant="muted">
-          Optional. Turns podcast episodes and other recordings into texts you can read along with. Uses your own OpenAI
-          API key, which is stored only on this device. Audio you transcribe is sent to OpenAI.
-        </T>
-        {openAiKey ? (
-          <Row style={{ justifyContent: 'space-between' }}>
-            <T>Key saved (…{openAiKey.slice(-4)})</T>
-            <Button compact variant="danger" title="Remove" onPress={() => saveOpenAiKey(null)} />
-          </Row>
-        ) : (
-          <>
-            <Input
-              accessibilityLabel="OpenAI API key"
-              placeholder="sk-…"
-              value={openAiDraft}
-              onChangeText={setOpenAiDraft}
-              secureTextEntry
-            />
-            <Button
-              title="Save key"
-              disabled={!openAiDraft.trim()}
-              onPress={async () => {
-                await saveOpenAiKey(openAiDraft.trim());
-                setOpenAiDraft('');
-              }}
-            />
-          </>
-        )}
-      </Card>
+      <TranscriptionSettings />
 
       <Card>
         <T variant="heading">Backup</T>
