@@ -16,6 +16,7 @@ import type {
   KnownWord,
   LangCode,
   ReadingText,
+  SavedPodcast,
   ReviewEntry,
   SentencePair,
   Settings,
@@ -39,6 +40,8 @@ export interface AppState {
   /** Active role-play setup per language (tutor instructions); absent = free conversation. */
   chatScenarios: Record<LangCode, string | undefined>;
   texts: ReadingText[];
+  /** Podcast feeds the learner saved, per language. */
+  podcasts: SavedPodcast[];
   activity: ActivityLog;
   /** Every review, by local day, for fitting the scheduler to this learner. */
   reviewLog: Record<string, ReviewEntry[]>;
@@ -63,6 +66,9 @@ export interface AppState {
   addText: (text: Omit<ReadingText, 'id' | 'createdAt'> & { id?: string }) => ReadingText;
   addTextGlosses: (id: string, glosses: Record<string, string>) => void;
   removeText: (id: string) => void;
+  savePodcast: (podcast: Pick<SavedPodcast, 'lang' | 'url' | 'title'>) => void;
+  removePodcast: (lang: LangCode, url: string) => void;
+  markPodcastSeen: (lang: LangCode, url: string, title?: string) => void;
   restore: (backup: Backup) => void;
   markCelebrated: (lang: LangCode, ids: string[]) => void;
   dismissWeekly: (lang: LangCode, weekStart: string) => void;
@@ -71,7 +77,7 @@ export interface AppState {
 export type Backup = Pick<
   AppState,
   'settings' | 'customLanguages' | 'words' | 'userDicts' | 'extraSentences' | 'chats'
-> & Partial<Pick<AppState, 'texts' | 'activity' | 'reviewLog'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
+> & Partial<Pick<AppState, 'texts' | 'podcasts' | 'activity' | 'reviewLog'>> & { version: 1; dictEntries?: Record<string, DictEntry[]> };
 
 const migrateWords = (words: KnownWord[]) =>
   words.map((w) => ({ ...w, srs: migrateSrs(w.srs), ...(w.produce ? { produce: migrateSrs(w.produce) } : {}) }));
@@ -114,6 +120,7 @@ export const useStore = create<AppState>()(
       chats: {},
       chatScenarios: {},
       texts: [],
+      podcasts: [],
       activity: {},
       reviewLog: {},
       celebrated: {},
@@ -242,6 +249,22 @@ export const useStore = create<AppState>()(
         set((s) => ({ texts: s.texts.filter((t) => t.id !== id) }));
       },
 
+      savePodcast: ({ lang, url, title }) =>
+        set((s) =>
+          s.podcasts.some((p) => p.lang === lang && p.url === url)
+            ? s
+            : { podcasts: [...s.podcasts, { lang, url, title, addedAt: Date.now(), seenAt: Date.now() }] },
+        ),
+
+      removePodcast: (lang, url) => set((s) => ({ podcasts: s.podcasts.filter((p) => !(p.lang === lang && p.url === url)) })),
+
+      markPodcastSeen: (lang, url, title) =>
+        set((s) => ({
+          podcasts: s.podcasts.map((p) =>
+            p.lang === lang && p.url === url ? { ...p, seenAt: Date.now(), title: title ?? p.title } : p,
+          ),
+        })),
+
       markCelebrated: (lang, ids) =>
         set((s) => ({ celebrated: { ...s.celebrated, [lang]: [...new Set([...(s.celebrated[lang] ?? []), ...ids])] } })),
 
@@ -257,6 +280,7 @@ export const useStore = create<AppState>()(
           extraSentences: backup.extraSentences ?? {},
           chats: backup.chats ?? {},
           texts: backup.texts ?? [],
+          podcasts: backup.podcasts ?? [],
           activity: backup.activity ?? {},
           reviewLog: backup.reviewLog ?? {},
           recentSentences: {},
@@ -293,6 +317,7 @@ export const useStore = create<AppState>()(
         chats,
         chatScenarios,
         texts,
+        podcasts,
         activity,
         reviewLog,
         celebrated,
@@ -307,6 +332,7 @@ export const useStore = create<AppState>()(
         chats,
         chatScenarios,
         texts,
+        podcasts,
         activity,
         reviewLog,
         celebrated,

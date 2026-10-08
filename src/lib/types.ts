@@ -86,6 +86,16 @@ export interface ReadingText {
   audioUrl?: string;
 }
 
+export interface SavedPodcast {
+  lang: LangCode;
+  /** Feed URL; identifies the podcast. */
+  url: string;
+  title: string;
+  addedAt: number;
+  /** When the episode list was last opened; episodes published after this count as new. */
+  seenAt: number;
+}
+
 export interface AudioSegment {
   /** Seconds from the start of the audio. */
   start: number;

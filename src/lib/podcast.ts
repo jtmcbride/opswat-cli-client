@@ -19,6 +19,15 @@ export interface Feed {
 
 const AUDIO_EXT = /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4)(\?|#|$)/i;
 
+/** The show id in an Apple Podcasts link (podcasts.apple.com/…/id123456789), if it is one. */
+export function applePodcastId(url: string): string | null {
+  const m = /^https?:\/\/(?:podcasts|itunes)\.apple\.com\/.*\bid(\d+)/i.exec(url.trim());
+  return m ? m[1] : null;
+}
+
+/** Apple's public lookup endpoint, which returns a show's RSS feed URL. */
+export const appleLookupUrl = (id: string) => `https://itunes.apple.com/lookup?id=${id}&entity=podcast`;
+
 /** Whether a URL points straight at an audio file rather than a feed. */
 export const isAudioUrl = (url: string) => AUDIO_EXT.test(url);
 

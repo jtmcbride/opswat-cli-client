@@ -65,6 +65,7 @@ export default function SettingsScreen() {
       extraSentences: s.extraSentences,
       chats: s.chats,
       texts: s.texts,
+      podcasts: s.podcasts,
       activity: s.activity,
       reviewLog: s.reviewLog,
       dictEntries,

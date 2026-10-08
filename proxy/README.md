@@ -4,7 +4,8 @@ A small Cloudflare Worker that lets the web version of the app load podcast feed
 audio from hosts that don't allow cross-origin requests. The iOS and Android apps don't need it.
 
 It only accepts GET requests from the origins in `ALLOWED_ORIGINS`, only passes through RSS/XML
-and audio responses, and caps responses at `MAX_BYTES`, so it can't be used as a general proxy.
+feeds, audio, and Apple's podcast lookup API (to resolve Apple Podcasts links), and caps responses
+at `MAX_BYTES`, so it can't be used as a general proxy.
 (The Origin check stops other websites, not scripts that fake the header; add a Cloudflare rate
 limiting rule if that becomes a problem.)
 

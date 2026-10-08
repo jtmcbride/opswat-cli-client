@@ -152,7 +152,7 @@ export default function NewTextScreen() {
                 onPress={pickAudio}
               />
             ) : (
-              <PodcastPicker onPicked={pickEpisode} />
+              <PodcastPicker lang={lang} onPicked={pickEpisode} />
             )}
             {audio && (
               <T variant="small">

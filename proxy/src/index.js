@@ -2,13 +2,15 @@
  * CORS proxy for the Leximble web app: lets the browser load podcast feeds and episode audio from
  * hosts that don't send CORS headers. Deliberately narrow so it isn't an open proxy:
  * - only GET, only from ALLOWED_ORIGINS
- * - only RSS/XML feeds and audio responses
+ * - only RSS/XML feeds, audio, and Apple's podcast lookup API
  * - responses capped at MAX_BYTES
  */
 
 const AUDIO_PATH = /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4)$/i;
 
 function allowedType(type, url) {
+  // Apple's lookup API, which maps an Apple Podcasts link to the show's RSS feed.
+  if (url.hostname === 'itunes.apple.com' && url.pathname === '/lookup') return true;
   if (/^audio\//i.test(type) || /^video\/mp4/i.test(type)) return true;
   if (/xml|rss|atom/i.test(type)) return true;
   // Some CDNs serve episodes as generic binary.

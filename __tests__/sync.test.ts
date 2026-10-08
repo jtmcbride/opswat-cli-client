@@ -51,6 +51,7 @@ const empty = (): Synced => ({
   chats: {},
   chatScenarios: {},
   texts: [],
+  podcasts: [],
   activity: {},
   reviewLog: {},
 });
@@ -125,6 +126,18 @@ describe('applyItems', () => {
     );
     expect(patch.settings).toMatchObject({ dailyGoal: 50, reminder: { hour: 9, minute: 0 } });
     expect(patch.words).toEqual([expect.objectContaining({ id: 'local', gloss: 'house' })]);
+  });
+});
+
+describe('podcasts', () => {
+  it('syncs saved podcasts keyed by language and feed URL', () => {
+    const pod = { lang: 'es', url: 'https://feeds.example.com/cafe', title: 'Café', addedAt: 1, seenAt: 1 };
+    const s1 = empty();
+    const s2 = { ...s1, podcasts: [pod] };
+    expect(changedKeys(s1, s2)).toEqual(['podcast:es:https://feeds.example.com/cafe']);
+    const patch = applyItems(s1, new Map([['podcast:es:https://feeds.example.com/cafe', { ...pod, seenAt: 5 }]]));
+    expect(patch.podcasts).toEqual([{ ...pod, seenAt: 5 }]);
+    expect(applyItems(s2, new Map([['podcast:es:https://feeds.example.com/cafe', undefined]])).podcasts).toEqual([]);
   });
 });
 

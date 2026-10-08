@@ -4,13 +4,22 @@ import type { DayActivity } from './activity';
 import type { ChatTurn } from './ai';
 import { migrateSrs } from './srs';
 import { wordKey as keyOf } from './tokenize';
-import type { CustomLanguage, KnownWord, ReadingText, ReviewEntry, SentencePair, Settings, UserDictMeta } from './types';
+import type {
+  CustomLanguage,
+  KnownWord,
+  ReadingText,
+  ReviewEntry,
+  SavedPodcast,
+  SentencePair,
+  Settings,
+  UserDictMeta,
+} from './types';
 
 /**
  * The synced parts of the app state, split into items that merge independently across devices:
  * `word:<lang>:<word>`, `text:<id>`, `chat:<lang>`, `settings`, `lang:<code>`, `sentences:<lang>`,
- * `activity:<lang>:<day>`, `log:<day>` (review history) and `dict:<id>`. Words are keyed by spelling, so the same word added on
- * two devices becomes one item.
+ * `activity:<lang>:<day>`, `log:<day>` (review history), `dict:<id>` and `podcast:<lang>:<feed url>`. Words are keyed by
+ * spelling and podcasts by feed, so the same word or podcast added on two devices becomes one item.
  */
 export type Synced = Pick<
   AppState,
@@ -22,6 +31,7 @@ export type Synced = Pick<
   | 'chats'
   | 'chatScenarios'
   | 'texts'
+  | 'podcasts'
   | 'activity'
   | 'reviewLog'
 >;
@@ -45,6 +55,7 @@ type DeviceSettings = 'reminder';
 const deviceOnly = ({ reminder: _, ...rest }: Settings): Omit<Settings, DeviceSettings> => rest;
 
 const wordKey = (w: KnownWord) => keyOf(w.lang, w.word);
+const podcastKey = (p: SavedPodcast) => `${p.lang}:${p.url}`;
 
 function applyList<T>(
   list: T[],
@@ -157,6 +168,11 @@ const KINDS: Record<string, Kind> = {
     items: (s) => Object.entries(s.reviewLog).map(([day, list]) => ({ key: day, value: list, refs: [list] })),
     apply: (s, up, del) => ({ reviewLog: applyRecord<ReviewEntry[]>(s.reviewLog, up, del) }),
   },
+  podcast: {
+    slices: ['podcasts'],
+    items: (s) => s.podcasts.map((p) => ({ key: podcastKey(p), value: p, refs: [p] })),
+    apply: (s, up, del) => ({ podcasts: applyList(s.podcasts, podcastKey, up, del, (v) => v as SavedPodcast) }),
+  },
   dict: {
     slices: ['userDicts'],
     items: (s) => s.userDicts.map((d) => ({ key: d.id, value: d, refs: [d] })),
@@ -219,6 +235,7 @@ export function itemTime(key: string, value: unknown): number {
   }
   if (kind === 'text') return (value as ReadingText).createdAt;
   if (kind === 'dict') return (value as UserDictMeta).importedAt;
+  if (kind === 'podcast') return (value as SavedPodcast).seenAt;
   return 0;
 }
 

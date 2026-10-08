@@ -1,4 +1,4 @@
-import { isAudioUrl, isMp3, parseDuration, parseFeed } from '@/lib/podcast';
+import { applePodcastId, isAudioUrl, isMp3, parseDuration, parseFeed } from '@/lib/podcast';
 
 const FEED = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
@@ -59,5 +59,11 @@ describe('helpers', () => {
     expect(isMp3({ url: 'https://x.com/a.m4a', type: 'audio/mpeg' })).toBe(true);
     expect(isMp3({ url: 'https://x.com/a.mp3' })).toBe(true);
     expect(isMp3({ url: 'https://x.com/a.m4a', type: 'audio/x-m4a' })).toBe(false);
+  });
+
+  it('extracts the show id from Apple Podcasts links', () => {
+    expect(applePodcastId('https://podcasts.apple.com/us/podcast/coffee-break-spanish/id201384466')).toBe('201384466');
+    expect(applePodcastId('https://podcasts.apple.com/es/podcast/x/id123?i=1000600')).toBe('123');
+    expect(applePodcastId('https://feeds.example.com/id123.xml')).toBeNull();
   });
 });

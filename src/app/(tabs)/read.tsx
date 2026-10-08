@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { CoverageBar } from '@/components/CoverageBar';
 import { Button, Card, Empty, Row, Screen, T } from '@/components/ui';
@@ -25,20 +25,20 @@ export default function ReadScreen() {
   return (
     <Screen>
       <Row>
-        <Button title="Add text" icon="add" onPress={() => router.push('/read/new')} style={{ flex: 1 }} />
+        <Button title="Add text" icon="add" onPress={() => router.push('/read/new')} style={styles.action} />
         <Button
           title="AI story"
           icon="sparkles"
           variant="secondary"
           onPress={() => router.push({ pathname: '/read/new', params: { mode: 'ai' } })}
-          style={{ flex: 1 }}
+          style={styles.action}
         />
         <Button
           title="Audio"
           icon="mic"
           variant="secondary"
           onPress={() => router.push({ pathname: '/read/new', params: { mode: 'audio' } })}
-          style={{ flex: 1 }}
+          style={styles.action}
         />
       </Row>
       {texts.length === 0 ? (
@@ -81,3 +81,6 @@ export default function ReadScreen() {
     </Screen>
   );
 }
+
+// Side by side on most phones; on narrow screens the last button wraps to its own row.
+const styles = StyleSheet.create({ action: { flexGrow: 1, flexBasis: 0, minWidth: 104 } });
