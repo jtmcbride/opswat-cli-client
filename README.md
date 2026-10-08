@@ -25,6 +25,9 @@ The Leximble interface uses a mobile bottom bar, desktop sidebar, guided startin
   multiple choice or tap to reveal, then add the word to your list. Tap any word for its meaning.
 - **Read**: paste or import any text (or have AI write a story at ~95% known words). See what
   share of it you can read, tap any word for its meaning or audio, and add new words from it.
+- **Podcasts** (optional): transcribe an audio file, a podcast episode from its RSS feed, or an
+  audio link, then read along while it plays, with the current line highlighted and followed.
+  Long MP3 episodes are split and transcribed in parts. Uses your own OpenAI API key.
 - **Chat** (optional): an AI conversation partner that writes mostly with your known words and
   introduces one or two new ones per reply. Free conversation or role-plays (café, directions,
   hotel…); your mistakes are corrected and can be saved as flashcards. Dictate by voice and have
@@ -63,6 +66,17 @@ AI features need an [Anthropic API key](https://console.anthropic.com/). Paste i
 **Settings → AI tutor**. It is stored on the device (secure storage on iOS/Android, localStorage on
 web) and sent only to the Anthropic API. The default model is `claude-opus-5-5` and can be changed
 in Settings.
+
+## Podcast transcription (optional)
+
+Paste an [OpenAI API key](https://platform.openai.com/api-keys) in **Settings → Audio
+transcription**. Audio is sent to OpenAI's Whisper API, billed to that key (about $0.36 per hour of
+audio at the time of writing). The audio itself stays on the device that imported it; transcripts
+sync, and episodes imported from a link can be downloaded again on other devices.
+
+The iOS and Android apps load feeds and episodes directly. Browsers block most podcast hosts, so
+the web build needs a small proxy: deploy the Cloudflare Worker in [`proxy/`](proxy/README.md) and
+set the repository's Actions variable `MEDIA_PROXY_URL` (or `EXPO_PUBLIC_MEDIA_PROXY` in `.env`).
 
 ## Cloud sync (optional)
 

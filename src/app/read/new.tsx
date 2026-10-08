@@ -1,13 +1,15 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 
+import { PodcastPicker } from '@/components/PodcastPicker';
 import { Button, Card, Chip, Input, Row, Screen, T } from '@/components/ui';
 import { useTheme } from '@/constants/theme';
 import { useApiKey, useOpenAiKey } from '@/hooks/useApiKey';
 import { generateStory } from '@/lib/ai';
 import { saveAudio } from '@/lib/audioStore';
 import { pickAudioFile, pickTextFile } from '@/lib/files';
-import { MAX_AUDIO_BYTES, transcribeAudio, type AudioInput } from '@/lib/transcribe';
+import type { AudioInput } from '@/lib/transcribe';
+import { MAX_EPISODE_BYTES, transcribeLong } from '@/lib/transcribeLong';
 import { languageName, uid, useStore } from '@/store/useStore';
 
 export default function NewTextScreen() {
@@ -31,6 +33,9 @@ export default function NewTextScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audio, setAudio] = useState<AudioInput | null>(null);
+  const [audioSource, setAudioSource] = useState<'file' | 'link'>('file');
+  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined);
+  const [progress, setProgress] = useState<string | null>(null);
 
   const open = (id: string) => router.replace({ pathname: '/read/[id]', params: { id } });
 
@@ -74,7 +79,15 @@ export default function NewTextScreen() {
     if (!file) return;
     setError(null);
     setAudio(file);
+    setAudioUrl(undefined);
     setTitle(file.name.replace(/\.[^.]+$/, ''));
+  };
+
+  const pickEpisode = (file: AudioInput, episodeTitle: string, url: string) => {
+    setError(null);
+    setAudio(file);
+    setAudioUrl(url);
+    setTitle(episodeTitle);
   };
 
   const transcribe = async () => {
@@ -82,7 +95,7 @@ export default function NewTextScreen() {
     setBusy(true);
     setError(null);
     try {
-      const segments = await transcribeAudio({ apiKey: openAiKey, audio, lang });
+      const segments = await transcribeLong({ apiKey: openAiKey, audio, lang, onProgress: setProgress });
       const id = uid();
       let audioName: string | undefined = audio.name;
       try {
@@ -99,16 +112,18 @@ export default function NewTextScreen() {
         source: 'audio',
         segments,
         audioName,
+        audioUrl,
       });
       open(text.id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
-  const tooBig = !!audio?.size && audio.size > MAX_AUDIO_BYTES;
+  const tooBig = !!audio?.size && audio.size > MAX_EPISODE_BYTES;
 
   return (
     <Screen edges={['bottom']}>
@@ -123,26 +138,34 @@ export default function NewTextScreen() {
           <Card>
             <T variant="muted">
               Transcribe a {languageName(lang, custom)} podcast episode or other recording, then read along while it plays.
-              Files up to 25 MB (about 25 minutes of a typical podcast).
+              Long MP3 episodes are transcribed in parts. Transcription is billed to your OpenAI account.
             </T>
-            <Button
-              variant="secondary"
-              icon="musical-notes"
-              title={audio ? 'Choose a different file' : 'Choose audio file'}
-              onPress={pickAudio}
-            />
+            <Row>
+              <Chip label="File" selected={audioSource === 'file'} onPress={() => setAudioSource('file')} />
+              <Chip label="Podcast or link" selected={audioSource === 'link'} onPress={() => setAudioSource('link')} />
+            </Row>
+            {audioSource === 'file' ? (
+              <Button
+                variant="secondary"
+                icon="musical-notes"
+                title={audio ? 'Choose a different file' : 'Choose audio file'}
+                onPress={pickAudio}
+              />
+            ) : (
+              <PodcastPicker onPicked={pickEpisode} />
+            )}
             {audio && (
               <T variant="small">
                 {audio.name}
                 {audio.size ? ` · ${(audio.size / 1024 / 1024).toFixed(1)} MB` : ''}
               </T>
             )}
-            {tooBig && <T style={{ color: t.danger }}>This file is over the 25 MB limit. Try a shorter or lower-bitrate file.</T>}
+            {tooBig && <T style={{ color: t.danger }}>This file is over the {MAX_EPISODE_BYTES / 1024 / 1024} MB limit.</T>}
             {audio && (
               <Input accessibilityLabel="Title" placeholder="Title (optional)" value={title} onChangeText={setTitle} autoCapitalize="sentences" />
             )}
             <Button title="Transcribe" icon="mic" onPress={transcribe} loading={busy} disabled={!audio || tooBig} />
-            {busy && <T variant="small">Transcribing… this can take a minute or two.</T>}
+            {busy && progress && <T variant="small">{progress} This can take a few minutes for a long episode.</T>}
             {error && <T style={{ color: t.danger }}>{error}</T>}
           </Card>
         ) : (

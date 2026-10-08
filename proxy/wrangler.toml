@@ -1,0 +1,9 @@
+name = "leximble-media-proxy"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+# Sites allowed to use the proxy (exact origins, comma-separated).
+ALLOWED_ORIGINS = "https://jtmcbride.github.io,http://localhost:8081"
+# Largest response passed through, in bytes (250 MB).
+MAX_BYTES = "262144000"

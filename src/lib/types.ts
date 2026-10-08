@@ -82,6 +82,8 @@ export interface ReadingText {
   segments?: AudioSegment[];
   /** Original audio file name. The audio itself stays on the device that imported it (see lib/audioStore). */
   audioName?: string;
+  /** Where the audio was downloaded from, so other devices can fetch it again. */
+  audioUrl?: string;
 }
 
 export interface AudioSegment {

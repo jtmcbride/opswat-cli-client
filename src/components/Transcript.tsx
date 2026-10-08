@@ -4,9 +4,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Sentence } from '@/components/Sentence';
-import { Row, Screen, T } from '@/components/ui';
+import { Button, Row, Screen, T } from '@/components/ui';
 import { radius, space, useTheme } from '@/constants/theme';
-import { getAudioUri, releaseAudioUri } from '@/lib/audioStore';
+import { downloadAudio } from '@/lib/audioFiles';
+import { getAudioUri, releaseAudioUri, saveAudio } from '@/lib/audioStore';
 import type { DictIndex } from '@/lib/dictionary';
 import type { AudioSegment, ReadingText } from '@/lib/types';
 
@@ -31,21 +32,43 @@ export const PLAYER_BAR_SPACE = 84;
  */
 export function Transcript({ text, index, known, onWord, header, footer }: Props) {
   const [uri, setUri] = useState<string | null | undefined>(text.audioName ? undefined : null);
+  const [fetching, setFetching] = useState<{ progress: number | null } | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!text.audioName) return;
     let live = true;
-    let loaded: string | null = null;
     getAudioUri(text.id).then((u) => {
-      loaded = u;
       if (live) setUri(u);
       else if (u) releaseAudioUri(u);
     });
     return () => {
       live = false;
-      if (loaded) releaseAudioUri(loaded);
     };
   }, [text.id, text.audioName]);
+
+  // Release each loaded URI (web object URLs) when it's replaced or the page closes.
+  useEffect(
+    () => () => {
+      if (uri) releaseAudioUri(uri);
+    },
+    [uri],
+  );
+
+  const fetchAgain = async () => {
+    if (!text.audioUrl) return;
+    setFetching({ progress: null });
+    setFetchError(null);
+    try {
+      const audio = await downloadAudio(text.audioUrl, text.audioName ?? 'episode.mp3', (progress) => setFetching({ progress }));
+      await saveAudio(text.id, audio);
+      setUri(await getAudioUri(text.id));
+    } catch (e) {
+      setFetchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setFetching(null);
+    }
+  };
 
   if (!uri) {
     return (
@@ -53,6 +76,21 @@ export function Transcript({ text, index, known, onWord, header, footer }: Props
         {header}
         {uri === undefined ? (
           <T variant="muted">Loading audio…</T>
+        ) : text.audioUrl ? (
+          <>
+            <Button
+              variant="secondary"
+              icon="cloud-download-outline"
+              title={
+                fetching
+                  ? `Downloading audio…${fetching.progress != null ? ` ${Math.round(fetching.progress * 100)}%` : ''}`
+                  : 'Download audio to listen'
+              }
+              disabled={!!fetching}
+              onPress={fetchAgain}
+            />
+            {fetchError && <T variant="small">{fetchError}</T>}
+          </>
         ) : (
           <T variant="small">
             {text.audioName
