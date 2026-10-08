@@ -44,7 +44,14 @@ export async function transcribeLong({
     const chunk = await audioChunk(bytes.subarray(c.start, c.end), `${base}-part${i + 1}.mp3`);
     try {
       const part = await transcribeAudio({ apiKey, audio: chunk, lang });
-      segments.push(...part.map((s) => ({ ...s, start: s.start + c.startTime, end: s.end + c.startTime })));
+      segments.push(
+        ...part.map((s) => ({
+          ...s,
+          start: s.start + c.startTime,
+          end: s.end + c.startTime,
+          wordStarts: s.wordStarts?.map((w) => Math.round((w + c.startTime) * 100) / 100),
+        })),
+      );
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       // A silent stretch (music, an ad break) shouldn't fail the whole episode.

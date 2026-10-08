@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { CoverageBar } from '@/components/CoverageBar';
@@ -8,7 +8,7 @@ import { ExplainButton } from '@/components/ExplainButton';
 import { SayIt } from '@/components/SayIt';
 import { glossFor, Sentence } from '@/components/Sentence';
 import { SpeakButton } from '@/components/SpeakButton';
-import { PLAYER_BAR_SPACE, Transcript } from '@/components/Transcript';
+import { PLAYER_BAR_SPACE, Transcript, type TranscriptControls } from '@/components/Transcript';
 import { Button, Card, Row, Screen, T } from '@/components/ui';
 import { radius, space, useTheme } from '@/constants/theme';
 import { useApiKey } from '@/hooks/useApiKey';
@@ -24,6 +24,8 @@ interface Peek {
   lemma: string;
   gloss?: string;
   sentence: string;
+  /** For transcripts: where to start the audio to hear this word in context. */
+  at?: number;
 }
 
 export default function ReaderScreen() {
@@ -42,6 +44,7 @@ export default function ReaderScreen() {
   const [peek, setPeek] = useState<Peek | null>(null);
   const [looking, setLooking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const playerRef = useRef<TranscriptControls | null>(null);
 
   const paragraphs = useMemo(() => (text ? splitParagraphs(text.body).map(splitSentences) : []), [text]);
   const stats = useMemo(() => (text && index ? coverage(text.body, index, lemmas) : null), [text, index, lemmas]);
@@ -62,7 +65,7 @@ export default function ReaderScreen() {
   };
   const glossOf = (lemma: string) => glosses?.[lemma] ?? index?.get(lemma)?.gloss;
 
-  const onWord = (surface: string, ls: string[], sentence: string) => {
+  const onWord = (surface: string, ls: string[], sentence: string, at?: number) => {
     if (!index) return;
     setError(null);
     const lemma = ls.find((l) => !lemmas.has(l)) ?? ls[0];
@@ -71,6 +74,7 @@ export default function ReaderScreen() {
       lemma: index.get(lemma)?.lemma ?? surface,
       gloss: glossFor(index, surface, ls, glosses),
       sentence: sentence.trim(),
+      at,
     });
   };
 
@@ -157,7 +161,15 @@ export default function ReaderScreen() {
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <Stack.Screen options={{ title: text.title }} />
       {segments && index ? (
-        <Transcript text={{ ...text, segments }} index={index} known={lemmas} onWord={onWord} header={header} footer={footer} />
+        <Transcript
+          text={{ ...text, segments }}
+          index={index}
+          known={lemmas}
+          onWord={onWord}
+          header={header}
+          footer={footer}
+          controlsRef={playerRef}
+        />
       ) : (
         <Screen edges={['bottom']}>
           {header}
@@ -200,7 +212,18 @@ export default function ReaderScreen() {
               </T>
               <T variant="muted">{peek.gloss ?? 'Not in dictionary'}</T>
             </View>
-            <SpeakButton text={peek.surface} lang={lang} size={20} />
+            {peek.at !== undefined ? (
+              <Button
+                compact
+                variant="secondary"
+                icon="play"
+                title="In context"
+                accessibilityLabel="Play this word in context"
+                onPress={() => playerRef.current?.playFrom(peek.at!)}
+              />
+            ) : (
+              <SpeakButton text={peek.surface} lang={lang} size={20} />
+            )}
             {peek.gloss ? (
               lemmas.has(index?.lemmaOf(peek.lemma) ?? '') ? (
                 <T variant="small">Known</T>

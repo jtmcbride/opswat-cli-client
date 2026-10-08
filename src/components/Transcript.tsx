@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Sentence } from '@/components/Sentence';
@@ -10,8 +10,17 @@ import { downloadAudio } from '@/lib/audioFiles';
 import { getAudioUri, releaseAudioUri, saveAudio } from '@/lib/audioStore';
 import type { DictIndex } from '@/lib/dictionary';
 import type { AudioSegment, ReadingText } from '@/lib/types';
+import { wordAt } from '@/lib/wordSync';
 
-type OnWord = (surface: string, lemmas: string[], sentence: string) => void;
+/** `at` is where to start playback to hear the word in context (only when the audio is playable). */
+type OnWord = (surface: string, lemmas: string[], sentence: string, at?: number) => void;
+
+/** Lead-in before a word when playing it in context, in seconds. */
+const CONTEXT_LEAD = 1.5;
+
+export interface TranscriptControls {
+  playFrom: (seconds: number) => void;
+}
 
 interface Props {
   text: ReadingText & { segments: AudioSegment[] };
@@ -21,6 +30,8 @@ interface Props {
   /** Rendered above and below the transcript, inside the scroll view. */
   header?: ReactNode;
   footer?: ReactNode;
+  /** Set while the audio player is available, so the page can start playback (e.g. from a word). */
+  controlsRef?: RefObject<TranscriptControls | null>;
 }
 
 /** Height reserved under the transcript for the pinned player bar. */
@@ -30,7 +41,7 @@ export const PLAYER_BAR_SPACE = 84;
  * Page body for a transcribed text: the timed lines, and a player bar pinned to the bottom when the
  * audio is on this device.
  */
-export function Transcript({ text, index, known, onWord, header, footer }: Props) {
+export function Transcript({ text, index, known, onWord, header, footer, controlsRef }: Props) {
   const [uri, setUri] = useState<string | null | undefined>(text.audioName ? undefined : null);
   const [fetching, setFetching] = useState<{ progress: number | null } | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -103,15 +114,18 @@ export function Transcript({ text, index, known, onWord, header, footer }: Props
       </Screen>
     );
   }
-  return <Player key={uri} uri={uri} {...{ text, index, known, onWord, header, footer }} />;
+  return <Player key={uri} uri={uri} {...{ text, index, known, onWord, header, footer, controlsRef }} />;
 }
 
-function Player({ uri, text, index, known, onWord, header, footer }: Props & { uri: string }) {
+function Player({ uri, text, index, known, onWord, header, footer, controlsRef }: Props & { uri: string }) {
   const t = useTheme();
-  const player = useAudioPlayer(uri, { updateInterval: 250 });
+  // Frequent updates so the word highlight keeps pace with speech.
+  const player = useAudioPlayer(uri, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
   const time = status.currentTime;
   const current = text.segments.findIndex((s, i) => time >= s.start && (time < s.end || i === text.segments.length - 1));
+  const starts = current >= 0 ? text.segments[current].wordStarts : undefined;
+  const activeWord = starts ? wordAt(starts, time) : undefined;
 
   // Follow along: keep the playing line in view until the learner scrolls away themselves.
   const { height } = useWindowDimensions();
@@ -148,6 +162,14 @@ function Player({ uri, text, index, known, onWord, header, footer }: Props & { u
     player.play();
   };
 
+  useEffect(() => {
+    if (!controlsRef) return;
+    controlsRef.current = { playFrom };
+    return () => {
+      controlsRef.current = null;
+    };
+  });
+
   return (
     <>
       <Screen edges={['bottom']} scrollRef={scrollRef} onScroll={onScroll}>
@@ -158,6 +180,7 @@ function Player({ uri, text, index, known, onWord, header, footer }: Props & { u
           known={known}
           onWord={onWord}
           current={current}
+          activeWord={activeWord}
           onPlay={playFrom}
           onLayout={(y) => (linesY.current = y)}
           onLineLayout={(i, y) => (lineYs.current[i] = y)}
@@ -194,6 +217,7 @@ function Lines({
   known,
   onWord,
   current,
+  activeWord,
   onPlay,
   onLayout,
   onLineLayout,
@@ -203,33 +227,94 @@ function Lines({
   known: Set<string>;
   onWord: OnWord;
   current?: number;
+  activeWord?: number;
   onPlay?: (seconds: number) => void;
   onLayout?: (y: number) => void;
   onLineLayout?: (i: number, y: number) => void;
 }) {
-  const t = useTheme();
+  // Stable handlers, so only the lines whose highlight changes re-render as playback advances.
+  const latest = useRef({ onWord, onPlay, onLineLayout });
+  useEffect(() => {
+    latest.current = { onWord, onPlay, onLineLayout };
+  });
+  const handlers = useMemo<LineHandlers>(
+    () => ({
+      word: (...args) => latest.current.onWord(...args),
+      play: (seconds) => latest.current.onPlay?.(seconds),
+      layout: (i, y) => latest.current.onLineLayout?.(i, y),
+    }),
+    [],
+  );
   return (
     <View style={{ gap: space.xs }} onLayout={onLayout && ((e) => onLayout(e.nativeEvent.layout.y))}>
       {segments.map((s, i) => (
-        <View
+        <Line
           key={i}
-          style={[styles.line, i === current && { backgroundColor: t.primarySoft }]}
-          onLayout={onLineLayout && ((e) => onLineLayout(i, e.nativeEvent.layout.y))}>
-          {onPlay && <IconButton icon="play" label={`Play from ${clock(s.start)}`} size={18} onPress={() => onPlay(s.start)} />}
-          <Text style={{ flex: 1, color: t.text, fontSize: 19, lineHeight: 30 }}>
-            <Sentence
-              text={s.text}
-              index={index}
-              known={known}
-              style={{ fontSize: 19, lineHeight: 30 }}
-              onWordPress={(w, ls) => onWord(w, ls, s.text)}
-            />
-          </Text>
-        </View>
+          segment={s}
+          i={i}
+          index={index}
+          known={known}
+          current={i === current}
+          activeWord={i === current ? activeWord : undefined}
+          playable={!!onPlay}
+          handlers={handlers}
+        />
       ))}
     </View>
   );
 }
+
+interface LineHandlers {
+  word: OnWord;
+  play: (seconds: number) => void;
+  layout: (i: number, y: number) => void;
+}
+
+const Line = memo(function Line({
+  segment: s,
+  i,
+  index,
+  known,
+  current,
+  activeWord,
+  playable,
+  handlers,
+}: {
+  segment: AudioSegment;
+  i: number;
+  index: DictIndex;
+  known: Set<string>;
+  current: boolean;
+  activeWord?: number;
+  playable: boolean;
+  handlers: LineHandlers;
+}) {
+  const t = useTheme();
+  return (
+    <View
+      style={[styles.line, current && { backgroundColor: t.primarySoft }]}
+      onLayout={(e) => handlers.layout(i, e.nativeEvent.layout.y)}>
+      {playable && <IconButton icon="play" label={`Play from ${clock(s.start)}`} size={18} onPress={() => handlers.play(s.start)} />}
+      <Text style={{ flex: 1, color: t.text, fontSize: 19, lineHeight: 30 }}>
+        <Sentence
+          text={s.text}
+          index={index}
+          known={known}
+          activeWord={activeWord}
+          style={{ fontSize: 19, lineHeight: 30 }}
+          onWordPress={(w, ls, wi) =>
+            handlers.word(
+              w,
+              ls,
+              s.text,
+              playable ? Math.max(s.start, (s.wordStarts?.[wi] ?? s.start) - CONTEXT_LEAD) : undefined,
+            )
+          }
+        />
+      </Text>
+    </View>
+  );
+});
 
 function IconButton({
   icon,

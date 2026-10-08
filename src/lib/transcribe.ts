@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
 import type { AudioSegment, LangCode } from '@/lib/types';
+import { alignWordStarts, wordsByLine, type TimedWord } from '@/lib/wordSync';
 
 /** OpenAI's upload limit for the transcription endpoint. */
 export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
@@ -37,6 +38,7 @@ export async function transcribeAudio({
   form.append('model', 'whisper-1');
   form.append('response_format', 'verbose_json');
   form.append('timestamp_granularities[]', 'segment');
+  form.append('timestamp_granularities[]', 'word');
   // Whisper takes ISO-639-1 codes; let it auto-detect anything else (e.g. custom languages).
   const iso = lang.toLowerCase().split(/[-_]/)[0];
   if (/^[a-z]{2}$/.test(iso)) form.append('language', iso);
@@ -51,14 +53,25 @@ export async function transcribeAudio({
   return parseSegments(body);
 }
 
-/** Pulls clean, non-empty segments out of a verbose_json transcription response. */
+/** Pulls clean, non-empty segments (with word timings when present) out of a verbose_json response. */
 export function parseSegments(body: unknown): AudioSegment[] {
-  const b = body as { text?: string; duration?: number; segments?: { start: number; end: number; text: string }[] } | null;
-  const segments = (b?.segments ?? [])
+  const b = body as {
+    text?: string;
+    duration?: number;
+    segments?: { start: number; end: number; text: string }[];
+    words?: TimedWord[];
+  } | null;
+  let segments: AudioSegment[] = (b?.segments ?? [])
     .map((s) => ({ start: s.start, end: s.end, text: s.text.trim() }))
     .filter((s) => s.text);
-  if (segments.length) return segments;
-  const text = b?.text?.trim();
-  if (!text) throw new Error('No speech was found in this audio.');
-  return [{ start: 0, end: b?.duration ?? 0, text }];
+  if (!segments.length) {
+    const text = b?.text?.trim();
+    if (!text) throw new Error('No speech was found in this audio.');
+    segments = [{ start: 0, end: b?.duration ?? b?.words?.at(-1)?.end ?? 0, text }];
+  }
+  if (b?.words?.length) {
+    const grouped = wordsByLine(segments, b.words);
+    segments = segments.map((s, i) => ({ ...s, wordStarts: alignWordStarts(s.text, grouped[i], s.start, s.end) }));
+  }
+  return segments;
 }

@@ -91,6 +91,8 @@ export interface AudioSegment {
   start: number;
   end: number;
   text: string;
+  /** Start time of each word of `text` as the reader tokenizes it, for word-by-word highlighting. */
+  wordStarts?: number[];
 }
 
 export interface UserDictMeta {

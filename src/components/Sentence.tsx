@@ -6,13 +6,14 @@ import { tokenize } from '@/lib/tokenize';
 
 /**
  * Renders text word-by-word. Unknown words are underlined, the target word is highlighted, and
- * every word is tappable.
+ * every word is tappable. `activeWord` (an index among the words) marks the word being spoken.
  */
 export function Sentence({
   text,
   index,
   known,
   target,
+  activeWord,
   onWordPress,
   style,
 }: {
@@ -20,14 +21,17 @@ export function Sentence({
   index: DictIndex;
   known: Set<string>;
   target?: string;
-  onWordPress?: (surface: string, lemmas: string[]) => void;
+  activeWord?: number;
+  onWordPress?: (surface: string, lemmas: string[], wordIndex: number) => void;
   style?: TextStyle;
 }) {
   const t = useTheme();
+  let word = -1;
   return (
     <Text style={[{ color: t.text, fontSize: 24, lineHeight: 36 }, style]}>
       {tokenize(text).map((tok, i) => {
         if (!tok.isWord) return <Text key={i}>{tok.text}</Text>;
+        const w = ++word;
         const lemmas = index.tokenLemmas(tok.norm);
         const isTarget = target !== undefined && lemmas.includes(target);
         const isUnknown = lemmas.some((l) => !known.has(l));
@@ -36,11 +40,12 @@ export function Sentence({
           : isUnknown
             ? { color: t.unknown, textDecorationLine: 'underline', textDecorationStyle: 'dotted' }
             : {};
+        const active: TextStyle | null = w === activeWord ? { backgroundColor: t.primaryBorder, borderRadius: 4 } : null;
         return (
           <Text
             key={i}
-            style={s}
-            onPress={onWordPress ? () => onWordPress(tok.text, lemmas) : undefined}
+            style={[s, active]}
+            onPress={onWordPress ? () => onWordPress(tok.text, lemmas, w) : undefined}
             suppressHighlighting>
             {tok.text}
           </Text>
