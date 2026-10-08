@@ -67,12 +67,16 @@ export function WordEntryForm({ lang, index, onClose, onMessage }: {
           {suggestions.length > 0 && (
             <View style={{ backgroundColor: t.surfaceAlt, borderRadius: 12, padding: 4 }}>
               {suggestions.map((entry) => (
-                <Pressable key={entry.lemma} accessibilityRole="button" accessibilityLabel={`Add ${entry.lemma}, ${entry.gloss}`}
-                  onPress={() => add(entry.lemma, entry.gloss)}
-                  style={({ pressed }) => ({ padding: 10, minHeight: 44, borderRadius: 8, backgroundColor: pressed ? t.primarySoft : 'transparent' })}>
-                  <T style={{ fontWeight: '600' }}>{entry.lemma}</T>
-                  <T variant="small" numberOfLines={2}>{entry.gloss}</T>
-                </Pressable>
+                <Row key={entry.lemma} style={{ flexWrap: 'nowrap', gap: space.xs }}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Edit ${entry.lemma} before adding`}
+                    onPress={() => { setWord(entry.lemma); setGloss(entry.gloss); setGlossTouched(false); }}
+                    style={({ pressed }) => ({ flex: 1, padding: 10, minHeight: 44, borderRadius: 8, backgroundColor: pressed ? t.primarySoft : 'transparent' })}>
+                    <T style={{ fontWeight: '600' }}>{entry.lemma}</T>
+                    <T variant="small" numberOfLines={2}>{entry.gloss}</T>
+                  </Pressable>
+                  <Button compact variant="secondary" icon="add" title="Add" accessibilityLabel={`Add ${entry.lemma}, ${entry.gloss}`}
+                    onPress={() => add(entry.lemma, entry.gloss)} />
+                </Row>
               ))}
             </View>
           )}
