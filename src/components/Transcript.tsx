@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Sentence } from '@/components/Sentence';
 import { Row, Screen, T } from '@/components/ui';
@@ -75,19 +75,55 @@ function Player({ uri, text, index, known, onWord, header, footer }: Props & { u
   const time = status.currentTime;
   const current = text.segments.findIndex((s, i) => time >= s.start && (time < s.end || i === text.segments.length - 1));
 
+  // Follow along: keep the playing line in view until the learner scrolls away themselves.
+  const { height } = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const linesY = useRef(0);
+  const lineYs = useRef<number[]>([]);
+  const autoScrollUntil = useRef(0);
+  const [follow, setFollow] = useState(true);
+
+  const scrollToLine = (i: number) => {
+    if (i < 0) return;
+    autoScrollUntil.current = Date.now() + 800;
+    // Approximate (ignores the page padding), which is fine for placing the line about a third down.
+    const y = linesY.current + (lineYs.current[i] ?? 0);
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - height * 0.3), animated: true });
+  };
+
+  useEffect(() => {
+    if (follow) scrollToLine(current);
+    // Only when the playing line changes or following is turned back on.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, follow]);
+
+  const onScroll = () => {
+    if (follow && Date.now() > autoScrollUntil.current) setFollow(false);
+  };
+
   const seek = (seconds: number) => {
     void player.seekTo(Math.max(0, seconds));
   };
   const playFrom = (seconds: number) => {
     seek(seconds);
+    setFollow(true);
     player.play();
   };
 
   return (
     <>
-      <Screen edges={['bottom']}>
+      <Screen edges={['bottom']} scrollRef={scrollRef} onScroll={onScroll}>
         {header}
-        <Lines segments={text.segments} index={index} known={known} onWord={onWord} current={current} onPlay={playFrom} />
+        <Lines
+          segments={text.segments}
+          index={index}
+          known={known}
+          onWord={onWord}
+          current={current}
+          onPlay={playFrom}
+          onLayout={(y) => (linesY.current = y)}
+          onLineLayout={(i, y) => (lineYs.current[i] = y)}
+        />
         {footer}
         <View style={{ height: PLAYER_BAR_SPACE }} />
       </Screen>
@@ -100,6 +136,12 @@ function Player({ uri, text, index, known, onWord, header, footer }: Props & { u
           onPress={() => (status.playing ? player.pause() : player.play())}
         />
         <IconButton icon="play-forward" label="Forward 10 seconds" onPress={() => seek(time + 10)} />
+        <IconButton
+          icon={follow ? 'locate' : 'locate-outline'}
+          label={follow ? 'Following along' : 'Follow along'}
+          muted={!follow}
+          onPress={() => (follow ? scrollToLine(current) : setFollow(true))}
+        />
         <T variant="small" style={{ marginLeft: 'auto' }}>
           {clock(time)} / {clock(status.duration || text.segments.at(-1)?.end || 0)}
         </T>
@@ -115,6 +157,8 @@ function Lines({
   onWord,
   current,
   onPlay,
+  onLayout,
+  onLineLayout,
 }: {
   segments: AudioSegment[];
   index: DictIndex;
@@ -122,12 +166,17 @@ function Lines({
   onWord: OnWord;
   current?: number;
   onPlay?: (seconds: number) => void;
+  onLayout?: (y: number) => void;
+  onLineLayout?: (i: number, y: number) => void;
 }) {
   const t = useTheme();
   return (
-    <View style={{ gap: space.xs }}>
+    <View style={{ gap: space.xs }} onLayout={onLayout && ((e) => onLayout(e.nativeEvent.layout.y))}>
       {segments.map((s, i) => (
-        <Row key={i} style={[styles.line, i === current && { backgroundColor: t.primarySoft }]}>
+        <View
+          key={i}
+          style={[styles.line, i === current && { backgroundColor: t.primarySoft }]}
+          onLayout={onLineLayout && ((e) => onLineLayout(i, e.nativeEvent.layout.y))}>
           {onPlay && <IconButton icon="play" label={`Play from ${clock(s.start)}`} size={18} onPress={() => onPlay(s.start)} />}
           <Text style={{ flex: 1, color: t.text, fontSize: 19, lineHeight: 30 }}>
             <Sentence
@@ -138,7 +187,7 @@ function Lines({
               onWordPress={(w, ls) => onWord(w, ls, s.text)}
             />
           </Text>
-        </Row>
+        </View>
       ))}
     </View>
   );
@@ -149,11 +198,13 @@ function IconButton({
   label,
   onPress,
   size = 24,
+  muted,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   onPress: () => void;
   size?: number;
+  muted?: boolean;
 }) {
   const t = useTheme();
   return (
@@ -163,7 +214,7 @@ function IconButton({
       hitSlop={8}
       onPress={onPress}
       style={({ pressed }) => ({ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.6 : 1 })}>
-      <Ionicons name={icon} size={size} color={t.primary} />
+      <Ionicons name={icon} size={size} color={muted ? t.textMuted : t.primary} />
     </Pressable>
   );
 }
@@ -191,5 +242,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  line: { alignItems: 'flex-start', flexWrap: 'nowrap', borderRadius: radius.sm, paddingRight: space.sm },
+  line: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm, borderRadius: radius.sm, paddingRight: space.sm },
 });

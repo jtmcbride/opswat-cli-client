@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,6 +8,8 @@ import {
   Text,
   TextInput,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type StyleProp,
   type TextInputProps,
   type TextProps,
@@ -24,10 +26,14 @@ export function Screen({
   children,
   scroll = true,
   edges = [],
+  scrollRef,
+  onScroll,
 }: {
   children: ReactNode;
   scroll?: boolean;
   edges?: ('top' | 'bottom')[];
+  scrollRef?: Ref<ScrollView>;
+  onScroll?: (e: NativeSyntheticEvent<NativeScrollEvent>) => void;
 }) {
   const t = useTheme();
   const wide = useWideLayout();
@@ -35,7 +41,12 @@ export function Screen({
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: t.bg }}>
       {scroll ? (
-        <ScrollView contentContainerStyle={[styles.scroll, wide && { padding: space.xxl }]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          ref={scrollRef}
+          onScroll={onScroll}
+          scrollEventThrottle={onScroll ? 100 : undefined}
+          contentContainerStyle={[styles.scroll, wide && { padding: space.xxl }]}
+          keyboardShouldPersistTaps="handled">
           {inner}
         </ScrollView>
       ) : (
