@@ -74,7 +74,7 @@ export function WordEntryForm({ lang, index, onClose, onMessage }: {
                     <T style={{ fontWeight: '600' }}>{entry.lemma}</T>
                     <T variant="small" numberOfLines={2}>{entry.gloss}</T>
                   </Pressable>
-                  <Button compact variant="secondary" icon="add" title="Add" accessibilityLabel={`Add ${entry.lemma}, ${entry.gloss}`}
+                  <Button compact icon="add" title="Add" accessibilityLabel={`Add ${entry.lemma}, ${entry.gloss}`}
                     onPress={() => add(entry.lemma, entry.gloss)} />
                 </Row>
               ))}
