@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
+import { SpeakButton } from '@/components/SpeakButton';
 import { Button, T } from '@/components/ui';
 import { space, useTheme } from '@/constants/theme';
 import { inflectionsFor } from '@/data';
@@ -31,11 +32,15 @@ export function InflectionTables({ lang, lemma, pos }: { lang: LangCode; lemma: 
           {s.rows.map((r) => (
             <View
               key={r.label}
-              style={{ flexDirection: 'row', gap: space.md, paddingVertical: 2, borderBottomWidth: 1, borderColor: t.surfaceAlt }}>
+              style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: 2, borderBottomWidth: 1, borderColor: t.surfaceAlt }}>
               <T variant="muted" style={{ width: 130 }}>
                 {r.label}
               </T>
               <T style={{ flex: 1 }}>{r.forms.join(' / ')}</T>
+              {/* Negative margin keeps the 44pt touch target without inflating the row height. */}
+              <View style={{ marginVertical: -10 }}>
+                <SpeakButton text={r.forms.join(', ')} lang={lang} size={20} />
+              </View>
             </View>
           ))}
         </View>
