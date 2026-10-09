@@ -1,5 +1,5 @@
 /**
- * CORS proxy for the Leximble web app: lets the browser load podcast feeds and episode audio from
+ * CORS proxy for the Leximple web app: lets the browser load podcast feeds and episode audio from
  * hosts that don't send CORS headers. Deliberately narrow so it isn't an open proxy:
  * - only GET, only from ALLOWED_ORIGINS
  * - only RSS/XML feeds, audio, and Apple's podcast lookup API
@@ -46,7 +46,7 @@ export default {
 
     let upstream;
     try {
-      upstream = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'LeximbleMediaProxy/1.0' } });
+      upstream = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'LeximpleMediaProxy/1.0' } });
     } catch {
       return new Response('Could not reach that site', { status: 502, headers: cors });
     }

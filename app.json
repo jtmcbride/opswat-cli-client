@@ -1,29 +1,29 @@
 {
   "expo": {
-    "name": "Leximble",
+    "name": "Leximple",
     "slug": "lingo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/leximble-icon.png",
+    "icon": "./assets/images/leximple-icon.png",
     "scheme": "lingo",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/leximble-icon.png",
+      "icon": "./assets/images/leximple-icon.png",
       "bundleIdentifier": "com.lingo.app"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#245BD6",
-        "foregroundImage": "./assets/images/leximble-icon.png"
+        "foregroundImage": "./assets/images/leximple-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.lingo.app"
     },
     "web": {
       "output": "single",
-      "favicon": "./assets/images/leximble-icon.png",
-      "name": "Leximble",
-      "shortName": "Leximble",
+      "favicon": "./assets/images/leximple-icon.png",
+      "name": "Leximple",
+      "shortName": "Leximple",
       "themeColor": "#245BD6",
       "backgroundColor": "#F7F7F2"
     },
@@ -33,18 +33,18 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#F7F7F2",
-          "image": "./assets/images/leximble-icon.png",
+          "image": "./assets/images/leximple-icon.png",
           "imageWidth": 76,
           "dark": {
             "backgroundColor": "#141A22",
-            "image": "./assets/images/leximble-icon.png"
+            "image": "./assets/images/leximple-icon.png"
           }
         }
       ],
       "expo-notifications"
     ],
     "experiments": {
-      "baseUrl": "/opswat-cli-client",
+      "baseUrl": "/leximple",
       "typedRoutes": true,
       "reactCompiler": true
     }

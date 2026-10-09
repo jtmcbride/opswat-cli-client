@@ -1,6 +1,6 @@
-# Leximble interface
+# Leximple interface
 
-Leximble uses a folded-page L mark, warm neutral surfaces, deep blue actions, and a system sans-serif type scale. The tagline is **Words that stay with you.** Shared colors live in `src/constants/theme.ts`; reusable controls live in `src/components/ui.tsx`.
+Leximple uses a folded-page L mark, warm neutral surfaces, deep blue actions, and a system sans-serif type scale. The tagline is **Words that stay with you.** Shared colors live in `src/constants/theme.ts`; reusable controls live in `src/components/ui.tsx`.
 
 ## Main flows
 
@@ -12,7 +12,7 @@ Leximble uses a folded-page L mark, warm neutral surfaces, deep blue actions, an
 
 ## Compatibility
 
-The public display name, logo, favicon, and splash configuration are Leximble. Existing storage keys, backup schema, Expo slug, URL scheme, native bundle/package IDs, and GitHub Pages base path are retained so this visual update does not migrate or orphan user data. The small navigation mark is a separate optimized asset from the full app icon.
+The public display name, logo, favicon, and splash configuration are Leximple. Existing storage keys, backup schema, Expo slug, URL scheme, native bundle/package IDs are retained so this visual update does not migrate or orphan user data. The small navigation mark is a separate optimized asset from the full app icon.
 
 ## Validation
 

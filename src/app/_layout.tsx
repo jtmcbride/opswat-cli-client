@@ -44,7 +44,7 @@ export default function RootLayout() {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 24, backgroundColor: t.bg }}>
         <Brand />
-        <ActivityIndicator color={t.primary} accessibilityLabel="Loading Leximble" />
+        <ActivityIndicator color={t.primary} accessibilityLabel="Loading Leximple" />
       </View>
     );
   }

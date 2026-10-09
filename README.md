@@ -1,4 +1,4 @@
-# Leximble
+# Leximple
 
 A simple, mobile-first vocabulary app. Track the words you know, drill them with spaced-repetition
 flashcards, pick up new words from context, and optionally chat with an AI tutor that sticks to
@@ -7,7 +7,7 @@ device unless you turn on sync.
 
 ## Interface
 
-The Leximble interface uses a mobile bottom bar, desktop sidebar, guided starting options, and a vocabulary-focused daily practice screen. See [design notes and validation](docs/design.md).
+The Leximple interface uses a mobile bottom bar, desktop sidebar, guided starting options, and a vocabulary-focused daily practice screen. See [design notes and validation](docs/design.md).
 
 ## Features
 
@@ -97,7 +97,7 @@ two settings below simply hide sync.
    [`supabase/migrations/20261006000000_sync.sql`](supabase/migrations/20261006000000_sync.sql)
    (or `npx supabase db push` with the Supabase CLI).
 2. **Authentication → Emails → Templates**: in **Magic Link** and **Confirm signup**, show the code
-   instead of (or as well as) the link, e.g. `<p>Your Leximble code: {{ .Token }}</p>`.
+   instead of (or as well as) the link, e.g. `<p>Your Leximple code: {{ .Token }}</p>`.
 3. **Authentication → Emails → SMTP**: the built-in sender only emails your project's team members
    and a few messages an hour, so set up custom SMTP (e.g. Resend, Brevo) before inviting others.
 4. Copy the project URL and publishable key (**Project Settings → API Keys**) into `.env`

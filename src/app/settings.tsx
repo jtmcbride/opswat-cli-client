@@ -69,7 +69,7 @@ export default function SettingsScreen() {
       reviewLog: s.reviewLog,
       dictEntries,
     };
-    await shareText(`leximble-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup));
+    await shareText(`leximple-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(backup));
   };
 
   const importBackup = async () => {
@@ -77,7 +77,7 @@ export default function SettingsScreen() {
     if (!file) return;
     try {
       const data = JSON.parse(file.text) as Backup;
-      if (data.version !== 1 || !Array.isArray(data.words)) throw new Error('Not a Leximble backup file');
+      if (data.version !== 1 || !Array.isArray(data.words)) throw new Error('Not a Leximple backup file');
       confirm(`Replace all current data with ${data.words.length} words from the backup?`, () => {
         restore(data);
         setMessage('Backup restored.');
